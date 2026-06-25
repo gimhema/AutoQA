@@ -7,6 +7,7 @@ mod observation;
 mod policy;
 mod stauts_observer;
 mod conn;
+mod conn_message;
 
 fn main() {
     println!("Hello, world!");
