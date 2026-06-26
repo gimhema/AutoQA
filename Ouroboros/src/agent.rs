@@ -11,13 +11,14 @@
 use std::io;
 use std::time::Duration;
 
-use serde_json::Value;
-
+use crate::actor::Actor;
 use crate::game_interface::GameInterface;
 
 pub struct Agent {
     /// 게임과의 고수준 통신 핸들.
     game: GameInterface,
+    /// 빠른 루프의 실행자. 액션 결정/전송을 위임받는다.
+    actor: Actor,
     /// 자연어 의도(intent). 향후 느린 루프에서 LLM에게 전달된다.
     intent: String,
     /// 빠른 루프 한 틱의 간격.
@@ -30,37 +31,33 @@ impl Agent {
         let game = GameInterface::connect(addr)?;
         Ok(Self {
             game,
+            actor: Actor::new(0),
             intent: intent.into(),
             tick: Duration::from_millis(16), // 약 60Hz
         })
     }
 
+    /// 액션 결정을 담당하는 Actor에 접근한다 (policy 주입 등).
+    pub fn actor_mut(&mut self) -> &mut Actor {
+        &mut self.actor
+    }
+
     /// 빠른 루프를 실행한다. 게임 연결이 끊기면 종료.
     ///
-    /// 아직 Policy/Actor가 없으므로 지금은 최신 관측을 가져와 (자리표시) 액션을
-    /// 결정하는 골격만 돈다. Policy 연동 시 `decide_action`을 교체한다.
+    /// 코어는 두 루프의 조율만 맡고, 액션 결정/전송은 [`Actor`]에 위임한다. 느린
+    /// 루프(LLM이 policy를 갱신)는 후속 작업에서 이 루프와 병행하도록 붙는다.
     pub fn run(&mut self) -> io::Result<()> {
         println!("[Agent] intent = {:?}", self.intent);
 
         while self.game.is_alive() {
             // 빠른 루프: 최신 관측만 사용하고 밀린 stale 관측은 버린다.
             if let Some(obs) = self.game.take_latest_observation() {
-                if let Some(command) = self.decide_action(&obs.state) {
-                    self.game.send_action(command)?;
-                }
+                self.actor.act(&obs.state, &mut self.game)?;
             }
             std::thread::sleep(self.tick);
         }
 
         println!("[Agent] 게임 연결 종료, 루프 중단");
         Ok(())
-    }
-
-    /// 관측 상태로부터 액션을 결정한다.
-    ///
-    /// **자리표시(placeholder)**: 현재는 아무 액션도 내지 않는다. 후속 작업에서
-    /// 현재 policy에서 액션을 샘플링하는 Actor 호출로 대체된다.
-    fn decide_action(&self, _state: &Value) -> Option<Value> {
-        None
     }
 }
