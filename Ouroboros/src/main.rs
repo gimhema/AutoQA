@@ -8,6 +8,8 @@ mod policy;
 mod stauts_observer;
 mod conn;
 mod conn_message;
+mod policy_discrete;
+mod policy_continuous;
 
 fn main() {
     println!("Hello, world!");
