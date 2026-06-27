@@ -13,6 +13,7 @@ use std::time::Duration;
 
 use crate::actor::Actor;
 use crate::game_interface::GameInterface;
+use crate::llm_interface::LlmClient;
 
 pub struct Agent {
     /// 게임과의 고수준 통신 핸들.
@@ -23,6 +24,8 @@ pub struct Agent {
     intent: String,
     /// 빠른 루프 한 틱의 간격.
     tick: Duration,
+    /// 로컬 LLM 클라이언트. 없으면 빠른 루프만 구동.
+    llm: Option<LlmClient>,
 }
 
 impl Agent {
@@ -34,7 +37,13 @@ impl Agent {
             actor: Actor::new(0),
             intent: intent.into(),
             tick: Duration::from_millis(16), // 약 60Hz
+            llm: None,
         })
+    }
+
+    /// 로컬 LLM 클라이언트를 설정한다.
+    pub fn set_llm(&mut self, llm: LlmClient) {
+        self.llm = Some(llm);
     }
 
     /// 액션 결정을 담당하는 Actor에 접근한다 (policy 주입 등).
