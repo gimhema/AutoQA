@@ -10,6 +10,7 @@ mod conn;
 mod conn_message;
 mod policy_discrete;
 mod policy_continuous;
+mod policy_gen;
 
 const DEFAULT_LLM_ENDPOINT: &str = "http://localhost:11434/v1/chat/completions";
 const DEFAULT_LLM_MODEL: &str = "llama3.2:1b";
