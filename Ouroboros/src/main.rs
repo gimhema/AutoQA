@@ -5,7 +5,7 @@ mod game_interface;
 mod llm_interface;
 mod observation;
 mod policy;
-mod stauts_observer;
+mod status_observer;
 mod conn;
 mod conn_message;
 mod policy_discrete;
