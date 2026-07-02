@@ -8,6 +8,8 @@ use crate::game::{Board, Kind, Piece, Player, Pos};
 
 // ANSI escape codes.
 const RESET: &str = "\x1b[0m";
+/// 화면 전체 지우기 + 커서를 좌상단으로. 매 턴 보드를 제자리에서 다시 그린다.
+pub const CLEAR: &str = "\x1b[2J\x1b[H";
 const WHITE_FG: &str = "\x1b[97;1m"; // 밝은 흰색 굵게
 const BLACK_FG: &str = "\x1b[96;1m"; // 밝은 청록 굵게
 const LIGHT_BG: &str = "\x1b[48;5;180m"; // 밝은 칸

@@ -123,8 +123,8 @@ fn run_join(args: &[String]) -> io::Result<()> {
 /// 공통 게임 루프. 자기 턴이면 stdin으로 이동을 받고, 아니면 상대 이동을 기다린다.
 fn play(mut board: Board, mut peer: Peer, me: Player) -> io::Result<()> {
     loop {
-        // 매 턴 보드 출력.
-        print!("\n{}", render::render_with_status(&board, me));
+        // 매 턴 화면을 지우고 보드를 제자리에서 다시 그린다.
+        print!("{}{}", render::CLEAR, render::render_with_status(&board, me));
         io::stdout().flush()?;
 
         if board.is_over() {
