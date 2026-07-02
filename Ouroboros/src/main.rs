@@ -5,6 +5,7 @@ mod game_interface;
 mod llm_interface;
 mod observation;
 mod policy;
+mod rulebook;
 mod status_observer;
 mod conn;
 mod conn_message;
@@ -21,6 +22,7 @@ fn main() {
     let mut llm_endpoint = DEFAULT_LLM_ENDPOINT.to_string();
     let mut llm_model = DEFAULT_LLM_MODEL.to_string();
     let mut action_space_json: Option<String> = None;
+    let mut rulebook_path: Option<String> = None;
     let mut positional = Vec::new();
 
     let mut i = 1;
@@ -47,6 +49,13 @@ fn main() {
                     std::process::exit(1);
                 }));
             }
+            "--rulebook" => {
+                i += 1;
+                rulebook_path = Some(args.get(i).cloned().unwrap_or_else(|| {
+                    eprintln!("--rulebook requires a file path");
+                    std::process::exit(1);
+                }));
+            }
             _ => positional.push(args[i].clone()),
         }
         i += 1;
@@ -58,7 +67,8 @@ fn main() {
              Options:\n  \
                --llm-endpoint URL    LLM server endpoint (default: {})\n  \
                --llm-model NAME      model name (default: {})\n  \
-               --action-space JSON   action space as JSON array (e.g. '[\"jump\",\"fire\"]')",
+               --action-space JSON   action space as JSON array (e.g. '[\"jump\",\"fire\"]')\n  \
+               --rulebook PATH       rulebook to study before playing (e.g. Rule/RULEBOOK.md)",
             args[0], DEFAULT_LLM_ENDPOINT, DEFAULT_LLM_MODEL
         );
         std::process::exit(1);
@@ -80,6 +90,15 @@ fn main() {
         agent.set_action_space(policy_gen::ActionSpace::Discrete {
             available_actions: actions,
         });
+    }
+
+    if let Some(path) = rulebook_path {
+        let rb = rulebook::Rulebook::load(&path).unwrap_or_else(|e| {
+            eprintln!("--rulebook: failed to load {path}: {e}");
+            std::process::exit(1);
+        });
+        agent.set_rulebook(rb);
+        eprintln!("[Ouroboros] rulebook loaded: {path} (게임 시작 전 숙지 예정)");
     }
 
     let llm = llm_interface::LlmClient::new(llm_endpoint.clone(), llm_model.clone());

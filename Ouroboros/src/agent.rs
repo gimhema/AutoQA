@@ -18,6 +18,7 @@ use crate::game_interface::GameInterface;
 use crate::llm_interface::LlmClient;
 use crate::policy::Policy;
 use crate::policy_gen::{self, ActionSpace};
+use crate::rulebook::Rulebook;
 use crate::status_observer::StatusObserver;
 
 pub struct Agent {
@@ -27,6 +28,7 @@ pub struct Agent {
     tick: Duration,
     llm: Option<LlmClient>,
     action_space: ActionSpace,
+    rulebook: Option<Rulebook>,
 }
 
 impl Agent {
@@ -41,6 +43,7 @@ impl Agent {
             action_space: ActionSpace::Discrete {
                 available_actions: vec![],
             },
+            rulebook: None,
         })
     }
 
@@ -50,6 +53,11 @@ impl Agent {
 
     pub fn set_action_space(&mut self, action_space: ActionSpace) {
         self.action_space = action_space;
+    }
+
+    /// 게임 시작 전 숙지할 룰북을 설정한다 (룰북 하네스).
+    pub fn set_rulebook(&mut self, rulebook: Rulebook) {
+        self.rulebook = Some(rulebook);
     }
 
     pub fn actor_mut(&mut self) -> &mut Actor {
@@ -99,26 +107,42 @@ impl Agent {
             &mut self.action_space,
             ActionSpace::Discrete { available_actions: vec![] },
         );
+        let rulebook = self.rulebook.take();
         let slow_tick = Duration::from_secs(5);
 
         thread::spawn(move || {
-            slow_loop(llm, intent, action_space, observer, alive, tx, slow_tick);
+            slow_loop(llm, intent, action_space, rulebook, observer, alive, tx, slow_tick);
         });
 
         Some(rx)
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn slow_loop(
     llm: LlmClient,
     intent: String,
     action_space: ActionSpace,
+    mut rulebook: Option<Rulebook>,
     observer: Arc<Mutex<StatusObserver>>,
     alive: Arc<AtomicBool>,
     policy_tx: mpsc::Sender<Box<dyn Policy>>,
     tick: Duration,
 ) {
     eprintln!("[SlowLoop] 시작, 간격 = {:?}", tick);
+
+    // 룰북 하네스: 게임 시작 전 룰을 숙지시킨다 (1회).
+    let rules = match rulebook.as_mut() {
+        Some(rb) if !rb.is_empty() => {
+            eprintln!("[SlowLoop] 룰북 숙지 중…");
+            match rb.study(&llm) {
+                Ok(_) => eprintln!("[SlowLoop] 룰북 숙지 완료"),
+                Err(e) => eprintln!("[SlowLoop] 룰북 숙지 실패(원문 사용): {e}"),
+            }
+            rb.context().to_string()
+        }
+        _ => String::new(),
+    };
 
     // 첫 관측이 도착할 때까지 대기.
     while alive.load(Ordering::Acquire) {
@@ -133,7 +157,7 @@ fn slow_loop(
         eprintln!("[SlowLoop] 초기 policy 생성 중…");
         let state = observer.lock().unwrap().latest_state().cloned();
         if let Some(state) = state {
-            match policy_gen::generate_policy(&llm, &intent, &state, &action_space) {
+            match policy_gen::generate_policy(&llm, &intent, &state, &action_space, &rules) {
                 Ok(policy) => {
                     let _ = policy_tx.send(policy);
                     eprintln!("[SlowLoop] 초기 policy 전송 완료");
@@ -153,14 +177,14 @@ fn slow_loop(
         let summary = observer.lock().unwrap().summarize();
         let state = observer.lock().unwrap().latest_state().cloned();
 
-        match critics::evaluate(&llm, &intent, &summary) {
+        match critics::evaluate(&llm, &intent, &summary, &rules) {
             Ok(Verdict::Keep) => {
                 eprintln!("[SlowLoop] Critics: KEEP");
             }
             Ok(Verdict::Regenerate { reason }) => {
                 eprintln!("[SlowLoop] Critics: REGENERATE — {reason}");
                 if let Some(state) = state {
-                    match policy_gen::generate_policy(&llm, &intent, &state, &action_space) {
+                    match policy_gen::generate_policy(&llm, &intent, &state, &action_space, &rules) {
                         Ok(policy) => {
                             if policy_tx.send(policy).is_err() {
                                 break;

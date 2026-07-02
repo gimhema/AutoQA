@@ -27,13 +27,22 @@ Respond with EXACTLY one of:
 Do not include any other text."#;
 
 /// intent와 최근 관측 이력을 기반으로 현재 policy를 평가한다.
+///
+/// `rules`는 게임 규칙 컨텍스트(룰북 숙지 브리핑)다. 있으면 평가자가 규칙을 알고
+/// intent 부합 여부를 판단하도록 user 메시지에 포함한다.
 pub fn evaluate(
     llm: &LlmClient,
     intent: &str,
     observation_summary: &str,
+    rules: &str,
 ) -> io::Result<Verdict> {
+    let rules_block = if rules.trim().is_empty() {
+        String::new()
+    } else {
+        format!("Game rules:\n{rules}\n\n")
+    };
     let user_msg = format!(
-        "Intent: {intent}\n\nRecent observations:\n{observation_summary}"
+        "{rules_block}Intent: {intent}\n\nRecent observations:\n{observation_summary}"
     );
 
     let response = llm.chat(&[

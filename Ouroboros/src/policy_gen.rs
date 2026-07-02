@@ -24,13 +24,17 @@ pub enum ActionSpace {
 }
 
 /// LLM에게 프롬프트를 보내고 응답을 파싱해 Policy를 생성한다.
+///
+/// `rules`는 게임 규칙 컨텍스트(룰북 하네스가 숙지시킨 브리핑)다. 비어 있으면 규칙
+/// 없이 생성하며, 있으면 시스템 프롬프트 앞에 붙여 규칙에 부합하는 policy를 유도한다.
 pub fn generate_policy(
     llm: &LlmClient,
     intent: &str,
     state_sample: &Value,
     action_space: &ActionSpace,
+    rules: &str,
 ) -> io::Result<Box<dyn Policy>> {
-    let system = build_system_prompt(action_space);
+    let system = build_system_prompt(action_space, rules);
     let user = build_user_prompt(intent, state_sample);
 
     let response = llm.chat(&[
@@ -67,7 +71,16 @@ pub fn parse_policy_response(
     }
 }
 
-fn build_system_prompt(action_space: &ActionSpace) -> String {
+fn build_system_prompt(action_space: &ActionSpace, rules: &str) -> String {
+    let base = build_schema_prompt(action_space);
+    if rules.trim().is_empty() {
+        base
+    } else {
+        format!("GAME RULES (you have studied these before playing):\n{rules}\n\n{base}")
+    }
+}
+
+fn build_schema_prompt(action_space: &ActionSpace) -> String {
     match action_space {
         ActionSpace::Discrete { available_actions } => {
             let actions_json = serde_json::to_string_pretty(available_actions)
@@ -303,10 +316,20 @@ Done."#;
         let action_space = ActionSpace::Discrete {
             available_actions: vec![json!("jump"), json!("fire")],
         };
-        let prompt = build_system_prompt(&action_space);
+        let prompt = build_system_prompt(&action_space, "");
         assert!(prompt.contains("jump"));
         assert!(prompt.contains("fire"));
         assert!(prompt.contains("choices"));
+    }
+
+    #[test]
+    fn system_prompt_includes_rules_when_provided() {
+        let action_space = ActionSpace::Discrete {
+            available_actions: vec![json!("jump")],
+        };
+        let prompt = build_system_prompt(&action_space, "Capturing the King wins the game.");
+        assert!(prompt.contains("GAME RULES"));
+        assert!(prompt.contains("Capturing the King wins"));
     }
 
     #[test]
@@ -315,7 +338,7 @@ Done."#;
             dims: 2,
             bounds: vec![(-180.0, 180.0), (0.0, 1.0)],
         };
-        let prompt = build_system_prompt(&action_space);
+        let prompt = build_system_prompt(&action_space, "");
         assert!(prompt.contains("-180"));
         assert!(prompt.contains("dims"));
         assert!(prompt.contains("mean"));
