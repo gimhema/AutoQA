@@ -88,8 +88,8 @@ pub fn run(config: AiConfig) -> io::Result<()> {
 
 /// 인간 턴: stdin 입력을 받아 이동을 적용하고 관측을 전송한다.
 fn human_turn(board: &mut Board, link: &mut OuroborosLink, ai_color: Player) -> io::Result<()> {
-    // 현재 상태를 Ouroboros에게도 알린다 (맥락 유지).
-    let _ = link.send_observation(board_to_observation(board, ai_color));
+    // valid_actions: [] → Ouroboros policy가 None 반환 → 액션 전송 자동 억제
+    let _ = link.send_observation(board_to_observation(board, ai_color, false));
 
     loop {
         match read_move(board) {
@@ -106,11 +106,11 @@ fn human_turn(board: &mut Board, link: &mut OuroborosLink, ai_color: Player) -> 
     }
 }
 
-/// AI 턴: 이전 턴의 낡은 액션을 비우고, 유효한 액션이 올 때까지 관측을 반복 전송한다.
+/// AI 턴: 유효한 액션이 올 때까지 관측을 반복 전송한다.
+///
+/// 인간 턴 중 Ouroboros는 `valid_actions: []` 관측을 받아 self-throttle하므로
+/// 낡은 액션이 누적되지 않는다. drain 불필요.
 fn ai_turn(board: &mut Board, link: &mut OuroborosLink, ai_color: Player) -> io::Result<()> {
-    // 이전 턴에 쌓인 낡은 액션을 모두 버린다.
-    while link.poll_action().is_some() {}
-
     println!("Ouroboros 생각 중…");
 
     loop {
@@ -122,7 +122,7 @@ fn ai_turn(board: &mut Board, link: &mut OuroborosLink, ai_color: Player) -> io:
             ));
         }
 
-        link.send_observation(board_to_observation(board, ai_color))?;
+        link.send_observation(board_to_observation(board, ai_color, true))?;
 
         if let Some(action) = link.poll_action() {
             match parse_action(&action.command) {
@@ -151,8 +151,9 @@ fn ai_turn(board: &mut Board, link: &mut OuroborosLink, ai_color: Player) -> io:
 /// 보드 상태를 Ouroboros Dynamic policy용 관측 JSON으로 직렬화한다.
 ///
 /// - 기물은 역할별 고정 키(`my_king`, `enemy_king` 등)로 표현한다.
-/// - `valid_actions`에 현재 AI 진영의 모든 합법 이동과 전략 피처를 포함한다.
-fn board_to_observation(board: &Board, ai_color: Player) -> Value {
+/// - `is_ai_turn = true`: `valid_actions`에 합법 이동과 전략 피처를 채운다.
+/// - `is_ai_turn = false`: `valid_actions: []` → policy가 None 반환 → 액션 억제.
+fn board_to_observation(board: &Board, ai_color: Player, is_ai_turn: bool) -> Value {
     let enemy = ai_color.other();
 
     let my_king = find_king(board, ai_color);
@@ -160,7 +161,11 @@ fn board_to_observation(board: &Board, ai_color: Player) -> Value {
     let my_pawns = find_pawns(board, ai_color);
     let enemy_pawns = find_pawns(board, enemy);
 
-    let valid_actions = compute_valid_actions(board, ai_color, &enemy_king);
+    let valid_actions = if is_ai_turn {
+        compute_valid_actions(board, ai_color, &enemy_king)
+    } else {
+        Value::Array(vec![])
+    };
 
     json!({
         "width":       board.width(),
