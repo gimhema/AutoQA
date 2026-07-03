@@ -1,7 +1,7 @@
 //! LLM 응답으로부터 Policy를 생성하는 모듈.
 //!
 //! 느린 루프의 핵심 파이프라인: intent + 관측 상태 → LLM 프롬프트 → JSON 응답 →
-//! [`DiscretePolicy`] 또는 [`ContinuousPolicy`] 객체.
+//! [`DiscretePolicy`], [`ContinuousPolicy`], 또는 [`DynamicDiscretePolicy`] 객체.
 
 use std::io;
 
@@ -11,16 +11,22 @@ use crate::llm_interface::{ChatMessage, LlmClient};
 use crate::policy::Policy;
 use crate::policy_continuous::ContinuousPolicy;
 use crate::policy_discrete::DiscretePolicy;
+use crate::policy_dynamic::DynamicDiscretePolicy;
 
 /// 게임의 액션 공간 정의. 어떤 종류의 policy를 생성할지 결정한다.
 pub enum ActionSpace {
+    /// 고정된 command 목록 중 하나를 선택한다.
     Discrete {
         available_actions: Vec<Value>,
     },
+    /// 연속 벡터 출력 (차원별 가우시안 샘플링).
     Continuous {
         dims: usize,
         bounds: Vec<(f64, f64)>,
     },
+    /// 관측의 `valid_actions` 배열에서 동적으로 선택한다.
+    /// 턴마다 유효 이동이 달라지는 게임(체스 등)에 적합.
+    Dynamic,
 }
 
 /// LLM에게 프롬프트를 보내고 응답을 파싱해 Policy를 생성한다.
@@ -65,6 +71,11 @@ pub fn parse_policy_response(
         }
         ActionSpace::Continuous { .. } => {
             let policy: ContinuousPolicy = serde_json::from_str(json_str)
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+            Ok(Box::new(policy))
+        }
+        ActionSpace::Dynamic => {
+            let policy: DynamicDiscretePolicy = serde_json::from_str(json_str)
                 .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
             Ok(Box::new(policy))
         }
@@ -154,6 +165,33 @@ Output a JSON object with this exact schema (no extra text outside the JSON):
 
 Rules are evaluated top-to-bottom; the first matching rule wins. Conditions within a rule are AND-combined. Use "path" with dot notation to access nested state fields. Values are clamped to bounds after sampling."#
             )
+        }
+        ActionSpace::Dynamic => {
+            r#"You are a game-playing policy generator. Each observation includes a "valid_actions" array — every legal move available this turn, annotated with strategic features.
+
+Your policy selects from valid_actions using two types of conditions:
+- state_conditions: evaluated against the full game state (e.g. "my_king.x", "enemy_king.y")
+- action_conditions: evaluated against each candidate action's features (e.g. "piece", "is_capture", "dist_to_enemy_king_delta")
+
+For each rule, first check state_conditions against the game state. If they pass, scan valid_actions and return the FIRST action where ALL action_conditions match.
+If no rule matches any valid action, a random valid action is chosen automatically.
+
+Output a JSON object with this exact schema (no extra text outside the JSON):
+{
+  "rules": [
+    {
+      "name": "human-readable rule name",
+      "state_conditions": [
+        { "path": "dot.notation.path", "op": "lt"|"le"|"gt"|"ge"|"eq"|"ne", "value": <number|string|bool|null> }
+      ],
+      "action_conditions": [
+        { "path": "action_field", "op": "lt"|"le"|"gt"|"ge"|"eq"|"ne", "value": <number|string|bool|null> }
+      ]
+    }
+  ]
+}
+
+Tip: Put high-priority rules first (e.g. "capture king" before "advance"). Use empty state_conditions or action_conditions arrays to mean "always true"."#.into()
         }
     }
 }

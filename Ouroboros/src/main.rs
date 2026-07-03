@@ -11,6 +11,7 @@ mod conn;
 mod conn_message;
 mod policy_discrete;
 mod policy_continuous;
+mod policy_dynamic;
 mod policy_gen;
 
 const DEFAULT_LLM_ENDPOINT: &str = "http://localhost:11434/v1/chat/completions";
@@ -67,7 +68,7 @@ fn main() {
              Options:\n  \
                --llm-endpoint URL    LLM server endpoint (default: {})\n  \
                --llm-model NAME      model name (default: {})\n  \
-               --action-space JSON   action space as JSON array (e.g. '[\"jump\",\"fire\"]')\n  \
+               --action-space VALUE  'dynamic' or JSON array (e.g. '[\"jump\",\"fire\"]')\n  \
                --rulebook PATH       rulebook to study before playing (e.g. Rule/RULEBOOK.md)",
             args[0], DEFAULT_LLM_ENDPOINT, DEFAULT_LLM_MODEL
         );
@@ -82,14 +83,17 @@ fn main() {
         .expect("failed to connect to game server");
 
     if let Some(json_str) = action_space_json {
-        let actions: Vec<serde_json::Value> = serde_json::from_str(&json_str)
-            .unwrap_or_else(|e| {
-                eprintln!("--action-space: invalid JSON: {e}");
-                std::process::exit(1);
-            });
-        agent.set_action_space(policy_gen::ActionSpace::Discrete {
-            available_actions: actions,
-        });
+        let action_space = if json_str.trim().eq_ignore_ascii_case("dynamic") {
+            policy_gen::ActionSpace::Dynamic
+        } else {
+            let actions: Vec<serde_json::Value> = serde_json::from_str(&json_str)
+                .unwrap_or_else(|e| {
+                    eprintln!("--action-space: invalid JSON (or use 'dynamic'): {e}");
+                    std::process::exit(1);
+                });
+            policy_gen::ActionSpace::Discrete { available_actions: actions }
+        };
+        agent.set_action_space(action_space);
     }
 
     if let Some(path) = rulebook_path {

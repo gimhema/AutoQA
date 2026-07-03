@@ -12,6 +12,7 @@
 
 mod game;
 mod net;
+mod ouroboros;
 mod render;
 
 use std::io::{self, Write};
@@ -26,6 +27,7 @@ fn main() {
     let result = match args.get(1).map(|s| s.as_str()) {
         Some("host") => run_host(&args[2..]),
         Some("join") => run_join(&args[2..]),
+        Some("ai") => run_ai(&args[2..]),
         _ => {
             print_usage(&args[0]);
             std::process::exit(1);
@@ -37,12 +39,18 @@ fn main() {
     }
 }
 
+const DEFAULT_OUROBOROS_PORT: u16 = 9000;
+
 fn print_usage(prog: &str) {
     eprintln!(
-        "MiniChess — TCP 2인 대전\n\n\
+        "MiniChess — TCP 2인 대전 / Ouroboros AI 대전\n\n\
          사용법:\n  \
            {prog} host [--width W] [--height H] [--pawns N] [--port P]\n  \
-           {prog} join <host:port>\n\n\
+           {prog} join <host:port>\n  \
+           {prog} ai   [--width W] [--height H] [--pawns N]\n  \
+                       [--ouroboros-port P] [--ai-side black|white]\n\n\
+         ai 모드 기본값: 필드 6x6, Pawn 4, Ouroboros 포트 {DEFAULT_OUROBOROS_PORT},\n  \
+                         인간=White(선공) / Ouroboros=Black(후공)\n\n\
          입력: <col> <row> <방향>  (방향: w=위 a=좌 s=아래 d=우)\n  \
          예: `2 4 w` = (2,4) 기물을 위로 한 칸\n"
     );
@@ -213,6 +221,58 @@ fn read_move(board: &Board, _me: Player) -> io::Result<Option<(Pos, Pos)>> {
         return Err(invalid("출발 좌표가 보드 밖입니다"));
     }
     Ok(Some((from, to)))
+}
+
+/// ai: Ouroboros가 한 진영을 담당하는 1인 모드.
+fn run_ai(args: &[String]) -> io::Result<()> {
+    let mut width = 6i32;
+    let mut height = 6i32;
+    let mut pawns = 4i32;
+    let mut ouroboros_port = DEFAULT_OUROBOROS_PORT;
+    let mut ai_side = Player::Black;
+
+    let mut i = 0;
+    while i < args.len() {
+        let need = |i: usize| -> io::Result<&String> {
+            args.get(i + 1)
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, format!("{} 값이 필요합니다", args[i])))
+        };
+        let parse_i32 = |i: usize| -> io::Result<i32> {
+            need(i)?
+                .parse()
+                .map_err(|_| invalid(format!("{} 값은 정수여야 합니다", args[i])))
+        };
+        match args[i].as_str() {
+            "--width"  => width  = parse_i32(i)?,
+            "--height" => height = parse_i32(i)?,
+            "--pawns"  => pawns  = parse_i32(i)?,
+            "--ouroboros-port" => {
+                ouroboros_port = need(i)?
+                    .parse()
+                    .map_err(|_| invalid(format!("{} 값은 포트 번호여야 합니다", args[i])))?;
+            }
+            "--ai-side" => {
+                ai_side = match need(i)?.to_ascii_lowercase().as_str() {
+                    "white" => Player::White,
+                    "black" => Player::Black,
+                    other   => return Err(invalid(format!("--ai-side: 'white' 또는 'black'이어야 합니다 (받은 값: {other})"))),
+                };
+            }
+            other => return Err(invalid(format!("알 수 없는 옵션: {other}"))),
+        }
+        i += 2;
+    }
+
+    let config = game::Config { width, height, pawns };
+    if let Err(e) = config.validate() {
+        return Err(invalid(e));
+    }
+
+    ouroboros::run(ouroboros::AiConfig {
+        board_config: config,
+        ai_player: ai_side,
+        ouroboros_port,
+    })
 }
 
 fn invalid(msg: impl Into<String>) -> io::Error {
