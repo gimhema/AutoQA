@@ -18,55 +18,73 @@ cargo build --release
 
 ## 인간 VS 인간
 
-**실행 순서**: host → join 순서로 실행한다.
+**터미널 2개** 필요. host가 TCP 서버, join이 접속한다.
 
+**Step 1** — 터미널 A: 방 만들기 (White·선공)
 ```bash
-# 터미널 1: 방 만들기 (White·선공)
 cargo run --release -- host --port 9500
+# "포트 9500에서 상대 접속 대기 중…" 메시지 후 대기
+```
 
-# 터미널 2: 방 참가 (Black·후공)
+**Step 2** — 터미널 B: 방 참가 (Black·후공)
+```bash
 cargo run --release -- join 127.0.0.1:9500
+# 연결되면 양쪽 터미널에서 게임 시작
 ```
 
 ---
 
 ## 인간 VS Ouroboros 에이전트
 
-> **실행 순서**: MiniChess가 TCP 서버 역할이므로 **항상 MiniChess를 먼저 실행**하고,
-> Ouroboros를 나중에 실행한다. 순서가 반대면 Ouroboros가 접속 대상을 찾지 못해 실패한다.
+**터미널 2개** 필요. MiniChess가 TCP 서버(방 개설), Ouroboros가 접속(join)한다.  
+**항상 MiniChess를 먼저 실행**해야 한다. 순서가 반대면 Ouroboros가 접속할 대상을 찾지 못해 실패한다.
+
+---
 
 ### 인간이 White (선공) — 기본값
 
+**Step 1** — 터미널 A: 게임 실행 (에이전트 접속 대기)
 ```bash
-# 1단계: MiniChess 실행 (Ouroboros 접속 대기)
+cd Games/MiniChess
 cargo run --release -- ai --ouroboros-port 9000
+# "포트 9000에서 Ouroboros 접속 대기 중…" 메시지 후 대기
+```
 
-# 2단계: Ouroboros 실행 (다른 터미널)
-cd ../../Ouroboros
+**Step 2** — 터미널 B: 에이전트 접속
+```bash
+cd Ouroboros
 cargo run --release -- 127.0.0.1:9000 "체스에서 이겨라" \
   --action-space dynamic \
   --rulebook ../Games/MiniChess/Rule/RULEBOOK.md \
   --llm-model phi4-mini
+# Ouroboros가 접속하면 양쪽 터미널에서 게임 시작
 ```
 
-인간(White)이 먼저 이동하고, Ouroboros(Black)가 응답한다.
+**Step 3** — 터미널 A에서 인간(White) 플레이  
+인간이 먼저 이동하고, Ouroboros(Black)가 응답한다.
 
 ---
 
 ### Ouroboros가 White (선공)
 
+**Step 1** — 터미널 A: 게임 실행 (에이전트 접속 대기)
 ```bash
-# 1단계: MiniChess 실행
+cd Games/MiniChess
 cargo run --release -- ai --ouroboros-port 9000 --ai-side white
+# "포트 9000에서 Ouroboros 접속 대기 중…" 메시지 후 대기
+```
 
-# 2단계: Ouroboros 실행
-cd ../../Ouroboros
+**Step 2** — 터미널 B: 에이전트 접속
+```bash
+cd Ouroboros
 cargo run --release -- 127.0.0.1:9000 "체스에서 이겨라" \
   --action-space dynamic \
   --rulebook ../Games/MiniChess/Rule/RULEBOOK.md \
   --llm-model phi4-mini
+# Ouroboros가 접속하면 양쪽 터미널에서 게임 시작
 ```
 
+**Step 3** — 터미널 A에서 인간(Black) 플레이  
 Ouroboros(White)가 먼저 이동하고, 인간(Black)이 응답한다.
 
 ---
