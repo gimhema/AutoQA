@@ -38,9 +38,9 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ### 2. 로컬 LLM 서버 (Ollama 권장)
 ```bash
 # Ollama 설치: https://ollama.com
-ollama pull qwen2.5:7b   # 권장 (JSON 생성 품질 우수, ~5GB)
+ollama pull phi4-mini    # 기본값 (~2.5GB, 경량)
 # 또는
-ollama pull phi4-mini    # 경량 대안 (~2.5GB)
+ollama pull qwen2.5:7b   # 더 높은 JSON 품질 (~5GB)
 
 ollama serve             # 서버 실행 (기본 포트 11434)
 ```
@@ -94,7 +94,7 @@ cd Ouroboros
 cargo run --release -- 127.0.0.1:9000 "체스에서 이겨라" \
   --action-space dynamic \
   --rulebook ../Games/MiniChess/Rule/RULEBOOK.md \
-  --llm-model qwen2.5:7b
+  --llm-model phi4-mini
 ```
 
 Ouroboros가 MiniChess에 접속하면 게임이 시작된다.
@@ -123,7 +123,7 @@ ai [--width W]           보드 가로 (기본 6)
 <host:port>              MiniChess 주소
 <intent>                 에이전트 목표 (자연어)
 --llm-endpoint URL       LLM 서버 주소 (기본 http://localhost:11434/v1/chat/completions)
---llm-model NAME         모델명 (기본 llama3.2:1b)
+--llm-model NAME         모델명 (기본 phi4-mini)
 --action-space VALUE     'dynamic' 또는 JSON 배열
 --rulebook PATH          게임 룰북 파일 경로
 ```

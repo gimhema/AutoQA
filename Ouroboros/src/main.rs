@@ -15,7 +15,7 @@ mod policy_dynamic;
 mod policy_gen;
 
 const DEFAULT_LLM_ENDPOINT: &str = "http://localhost:11434/v1/chat/completions";
-const DEFAULT_LLM_MODEL: &str = "llama3.2:1b";
+const DEFAULT_LLM_MODEL: &str = "phi4-mini";
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

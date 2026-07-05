@@ -46,7 +46,7 @@ cd ../../Ouroboros
 cargo run --release -- 127.0.0.1:9000 "체스에서 이겨라" \
   --action-space dynamic \
   --rulebook ../Games/MiniChess/Rule/RULEBOOK.md \
-  --llm-model qwen2.5:7b
+  --llm-model phi4-mini
 ```
 
 인간(White)이 먼저 이동하고, Ouroboros(Black)가 응답한다.
@@ -64,7 +64,7 @@ cd ../../Ouroboros
 cargo run --release -- 127.0.0.1:9000 "체스에서 이겨라" \
   --action-space dynamic \
   --rulebook ../Games/MiniChess/Rule/RULEBOOK.md \
-  --llm-model qwen2.5:7b
+  --llm-model phi4-mini
 ```
 
 Ouroboros(White)가 먼저 이동하고, 인간(Black)이 응답한다.
