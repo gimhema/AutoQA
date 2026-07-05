@@ -62,6 +62,22 @@ cd Games/MiniChess && cargo build --release
 
 ---
 
+## 실행: MiniChess 2인 대전 (인간 vs 인간)
+
+**터미널 1 — 방 만들기 (host, White·선공)**
+```bash
+cd Games/MiniChess
+cargo run --release -- host --port 9500
+```
+
+**터미널 2 — 방 참가 (join, Black·후공)**
+```bash
+cd Games/MiniChess
+cargo run --release -- join 127.0.0.1:9500
+```
+
+---
+
 ## 실행: MiniChess + Ouroboros
 
 MiniChess AI 모드에서 인간이 White(선공), Ouroboros가 Black(후공)을 담당한다.
