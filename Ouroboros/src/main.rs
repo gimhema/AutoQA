@@ -14,14 +14,12 @@ mod policy_continuous;
 mod policy_dynamic;
 mod policy_gen;
 
-const DEFAULT_LLM_ENDPOINT: &str = "http://localhost:11434/v1/chat/completions";
-const DEFAULT_LLM_MODEL: &str = "phi4-mini";
-
 fn main() {
     let args: Vec<String> = std::env::args().collect();
 
-    let mut llm_endpoint = DEFAULT_LLM_ENDPOINT.to_string();
-    let mut llm_model = DEFAULT_LLM_MODEL.to_string();
+    let cfg = load_config();
+    let mut llm_endpoint = cfg.llm_endpoint;
+    let mut llm_model = cfg.llm_model;
     let mut action_space_json: Option<String> = None;
     let mut rulebook_path: Option<String> = None;
     let mut positional = Vec::new();
@@ -66,11 +64,11 @@ fn main() {
         eprintln!(
             "Usage: {} <host:port> <intent> [options]\n\n\
              Options:\n  \
-               --llm-endpoint URL    LLM server endpoint (default: {})\n  \
-               --llm-model NAME      model name (default: {})\n  \
+               --llm-endpoint URL    LLM server endpoint (default: setting/config.ini)\n  \
+               --llm-model NAME      model name          (default: setting/config.ini)\n  \
                --action-space VALUE  'dynamic' or JSON array (e.g. '[\"jump\",\"fire\"]')\n  \
                --rulebook PATH       rulebook to study before playing (e.g. Rule/RULEBOOK.md)",
-            args[0], DEFAULT_LLM_ENDPOINT, DEFAULT_LLM_MODEL
+            args[0]
         );
         std::process::exit(1);
     }
@@ -113,4 +111,55 @@ fn main() {
         eprintln!("[Ouroboros] error: {e}");
         std::process::exit(1);
     }
+}
+
+struct Config {
+    llm_endpoint: String,
+    llm_model: String,
+}
+
+/// `setting/config.ini`에서 LLM 설정을 읽는다.
+///
+/// 탐색 순서: 실행 디렉터리 → 바이너리 디렉터리.
+/// 파일이 없으면 하드코딩된 기본값을 반환한다.
+/// CLI 인자가 주어지면 호출부에서 덮어쓴다.
+fn load_config() -> Config {
+    const DEFAULT_ENDPOINT: &str = "http://localhost:11434/v1/chat/completions";
+    const DEFAULT_MODEL: &str = "phi4-mini";
+    const CONFIG_PATH: &str = "setting/config.ini";
+
+    let content = std::fs::read_to_string(CONFIG_PATH).or_else(|_| {
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.join(CONFIG_PATH)))
+            .and_then(|p| std::fs::read_to_string(p).ok())
+            .ok_or(())
+    });
+
+    let Ok(content) = content else {
+        return Config {
+            llm_endpoint: DEFAULT_ENDPOINT.to_string(),
+            llm_model: DEFAULT_MODEL.to_string(),
+        };
+    };
+
+    let mut endpoint = DEFAULT_ENDPOINT.to_string();
+    let mut model = DEFAULT_MODEL.to_string();
+
+    for line in content.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('[') || line.starts_with('#') || line.starts_with(';') {
+            continue;
+        }
+        if let Some(v) = line.strip_prefix("DEFAULT_LLM_ENDPOINT=") {
+            endpoint = v.trim().to_string();
+        } else if let Some(v) = line.strip_prefix("DEFAULT_LLM_MODEL=") {
+            model = v.trim().to_string();
+        } else if let Some(v) = line.strip_prefix("DEFAULT_LLM_MODE=") {
+            model = v.trim().to_string();
+        }
+    }
+
+    eprintln!("[Ouroboros] config loaded from {CONFIG_PATH}");
+    Config { llm_endpoint: endpoint, llm_model: model }
 }
