@@ -1,79 +1,114 @@
-use std::collections::HashSet;
-use std::io::{self, stdout, Write};
-use std::time::{Duration, Instant};
+//! Invader — 좌우 이동과 탄환 발사로 상단 블록을 파괴하는 CLI 슈팅 게임.
+//!
+//! 실행:
+//!   play (기본): `invader` 또는 `invader play` — 사람이 A/D/S로 직접 조작.
+//!   ai:          `invader ai [--time-limit N] [--blocks N] [--ouroboros-port P]`
+//!                Ouroboros 에이전트가 접속해 플레이를 대신한다.
 
-use crossterm::{
-    cursor,
-    event::{self, Event, KeyCode, KeyEventKind},
-    execute,
-    style::Print,
-    terminal::{self, ClearType},
-};
-use rand::seq::SliceRandom;
-use rand::thread_rng;
+mod game;
+mod ouroboros;
+mod render;
 
-const WIDTH: i32 = 30;
-const HEIGHT: i32 = 20;
-const BLOCK_ROWS: i32 = 5;
-const TICK_MS: u64 = 50;
-const SHOOT_COOLDOWN: Duration = Duration::from_millis(400);
+use std::io::{self, Write};
+use std::time::Duration;
+
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+
+use game::{Config, Game, Outcome};
+
 const DEFAULT_TIME_LIMIT_SECS: u64 = 60;
 const DEFAULT_BLOCK_COUNT: usize = 20;
+const DEFAULT_OUROBOROS_PORT: u16 = 9000;
 
-struct Bullet {
-    x: i32,
-    y: i32,
+fn main() -> io::Result<()> {
+    let args: Vec<String> = std::env::args().collect();
+    let result = match args.get(1).map(|s| s.as_str()) {
+        Some("ai") => run_ai(&args[2..]),
+        Some("play") | None => run_play(),
+        Some(other) => {
+            eprintln!("알 수 없는 서브커맨드: {other}");
+            print_usage(&args[0]);
+            std::process::exit(1);
+        }
+    };
+    if let Err(e) = result {
+        eprintln!("오류: {e}");
+        std::process::exit(1);
+    }
+    Ok(())
 }
 
-struct GameConfig {
-    time_limit: Duration,
-    block_count: usize,
+fn print_usage(prog: &str) {
+    eprintln!(
+        "Invader — CLI 슈팅 게임 / Ouroboros AI 플레이\n\n\
+         사용법:\n  \
+           {prog} [play]                                                사람이 직접 조작\n  \
+           {prog} ai [--time-limit N] [--blocks N] [--ouroboros-port P]  Ouroboros가 플레이\n\n\
+         play 모드 조작: A/D 이동, S 발사, Q/Esc 종료\n"
+    );
 }
 
-enum Outcome {
+enum RunOutcome {
     Win,
     Lose,
     Quit,
 }
 
-struct TerminalGuard;
+/// 사람이 직접 조작하는 기본 모드.
+fn run_play() -> io::Result<()> {
+    let config = read_config_interactive();
+    let mut game = Game::new(&config);
+    let guard = render::TerminalGuard::new()?;
+    let mut out = io::stdout();
 
-impl TerminalGuard {
-    fn new() -> io::Result<Self> {
-        terminal::enable_raw_mode()?;
-        execute!(stdout(), terminal::EnterAlternateScreen, cursor::Hide)?;
-        Ok(TerminalGuard)
-    }
-}
+    let outcome = 'game_loop: loop {
+        if event::poll(Duration::from_millis(game::TICK_MS))? {
+            loop {
+                if let Event::Key(key) = event::read()? {
+                    if key.kind != KeyEventKind::Release {
+                        match key.code {
+                            KeyCode::Char('a') | KeyCode::Char('A') => game.move_left(),
+                            KeyCode::Char('d') | KeyCode::Char('D') => game.move_right(),
+                            KeyCode::Char('s') | KeyCode::Char('S') => {
+                                game.shoot();
+                            }
+                            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
+                                break 'game_loop RunOutcome::Quit;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                if !event::poll(Duration::from_millis(0))? {
+                    break;
+                }
+            }
+        }
 
-impl Drop for TerminalGuard {
-    fn drop(&mut self) {
-        let _ = execute!(stdout(), cursor::Show, terminal::LeaveAlternateScreen);
-        let _ = terminal::disable_raw_mode();
-    }
-}
+        match game.tick() {
+            Outcome::Win => break 'game_loop RunOutcome::Win,
+            Outcome::Lose => break 'game_loop RunOutcome::Lose,
+            Outcome::Ongoing => {}
+        }
 
-fn main() -> io::Result<()> {
-    let config = read_config();
+        render::draw(&mut out, &game, "(A/D 이동, S 발사, Q 종료)")?;
+    };
 
-    let guard = TerminalGuard::new()?;
-    let outcome = run_game(&config)?;
     drop(guard);
-
     match outcome {
-        Outcome::Win => println!("모든 블록을 파괴했습니다! 승리!"),
-        Outcome::Lose => println!("제한시간 종료. 블록을 모두 파괴하지 못했습니다. 패배!"),
-        Outcome::Quit => println!("게임을 종료합니다."),
+        RunOutcome::Win => println!("모든 블록을 파괴했습니다! 승리!"),
+        RunOutcome::Lose => println!("제한시간 종료. 블록을 모두 파괴하지 못했습니다. 패배!"),
+        RunOutcome::Quit => println!("게임을 종료합니다."),
     }
     Ok(())
 }
 
-fn read_config() -> GameConfig {
+fn read_config_interactive() -> Config {
     println!("=== Invader 설정 ===");
     let time_limit_secs = prompt_u64("제한시간(초)", DEFAULT_TIME_LIMIT_SECS);
-    let max_blocks = (WIDTH * BLOCK_ROWS) as usize;
+    let max_blocks = Config::max_blocks();
     let block_count = prompt_usize("블록 갯수", DEFAULT_BLOCK_COUNT, max_blocks);
-    GameConfig {
+    Config {
         time_limit: Duration::from_secs(time_limit_secs),
         block_count,
     }
@@ -113,139 +148,51 @@ fn prompt_usize(label: &str, default: usize, max: usize) -> usize {
     default.min(max)
 }
 
-fn run_game(config: &GameConfig) -> io::Result<Outcome> {
-    let mut rng = thread_rng();
-    let mut positions: Vec<(i32, i32)> = (0..WIDTH)
-        .flat_map(|x| (0..BLOCK_ROWS).map(move |y| (x, y)))
-        .collect();
-    positions.shuffle(&mut rng);
-    let mut blocks: HashSet<(i32, i32)> = positions.into_iter().take(config.block_count).collect();
-    let total_blocks = blocks.len();
+/// ai: Ouroboros가 게임 전체를 담당하는 자동 플레이 모드.
+fn run_ai(args: &[String]) -> io::Result<()> {
+    let mut time_limit_secs = DEFAULT_TIME_LIMIT_SECS;
+    let mut block_count = DEFAULT_BLOCK_COUNT;
+    let mut ouroboros_port = DEFAULT_OUROBOROS_PORT;
 
-    let mut player_x = WIDTH / 2;
-    let player_y = HEIGHT - 1;
-    let mut bullets: Vec<Bullet> = Vec::new();
-    let mut last_shot = Instant::now()
-        .checked_sub(SHOOT_COOLDOWN)
-        .unwrap_or_else(Instant::now);
-
-    let start = Instant::now();
-    let mut out = stdout();
-
-    loop {
-        if event::poll(Duration::from_millis(TICK_MS))? {
-            loop {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind != KeyEventKind::Release {
-                        match key.code {
-                            KeyCode::Char('a') | KeyCode::Char('A') => {
-                                player_x = (player_x - 1).max(0);
-                            }
-                            KeyCode::Char('d') | KeyCode::Char('D') => {
-                                player_x = (player_x + 1).min(WIDTH - 1);
-                            }
-                            KeyCode::Char('s') | KeyCode::Char('S') => {
-                                if last_shot.elapsed() >= SHOOT_COOLDOWN {
-                                    bullets.push(Bullet {
-                                        x: player_x,
-                                        y: player_y - 1,
-                                    });
-                                    last_shot = Instant::now();
-                                }
-                            }
-                            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
-                                return Ok(Outcome::Quit);
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                if !event::poll(Duration::from_millis(0))? {
-                    break;
-                }
+    let mut i = 0;
+    while i < args.len() {
+        let need = |i: usize| -> io::Result<&String> {
+            args.get(i + 1)
+                .ok_or_else(|| invalid(format!("{} 값이 필요합니다", args[i])))
+        };
+        match args[i].as_str() {
+            "--time-limit" => {
+                time_limit_secs = need(i)?
+                    .parse()
+                    .map_err(|_| invalid("--time-limit 값은 정수(초)여야 합니다"))?;
             }
-        }
-
-        let mut i = 0;
-        while i < bullets.len() {
-            bullets[i].y -= 1;
-            let pos = (bullets[i].x, bullets[i].y);
-            if bullets[i].y < 0 {
-                bullets.remove(i);
-            } else if blocks.remove(&pos) {
-                bullets.remove(i);
-            } else {
-                i += 1;
+            "--blocks" => {
+                block_count = need(i)?
+                    .parse()
+                    .map_err(|_| invalid("--blocks 값은 정수여야 합니다"))?;
             }
+            "--ouroboros-port" => {
+                ouroboros_port = need(i)?
+                    .parse()
+                    .map_err(|_| invalid("--ouroboros-port 값은 포트 번호여야 합니다"))?;
+            }
+            other => return Err(invalid(format!("알 수 없는 옵션: {other}"))),
         }
-
-        if blocks.is_empty() {
-            return Ok(Outcome::Win);
-        }
-
-        let elapsed = start.elapsed();
-        if elapsed >= config.time_limit {
-            return Ok(Outcome::Lose);
-        }
-
-        render(
-            &mut out,
-            player_x,
-            player_y,
-            &bullets,
-            &blocks,
-            total_blocks,
-            config.time_limit,
-            elapsed,
-        )?;
+        i += 2;
     }
+
+    let block_count = block_count.min(Config::max_blocks());
+    let config = Config {
+        time_limit: Duration::from_secs(time_limit_secs),
+        block_count,
+    };
+
+    ouroboros::run(ouroboros::AiConfig {
+        game_config: config,
+        ouroboros_port,
+    })
 }
 
-fn render(
-    out: &mut io::Stdout,
-    player_x: i32,
-    player_y: i32,
-    bullets: &[Bullet],
-    blocks: &HashSet<(i32, i32)>,
-    total_blocks: usize,
-    time_limit: Duration,
-    elapsed: Duration,
-) -> io::Result<()> {
-    let remaining = time_limit.saturating_sub(elapsed).as_secs();
-    let mut frame = String::new();
-    frame.push_str(&format!(
-        "[ Invader ]  남은 시간: {:>3}s   남은 블록: {:>3}/{:<3}   (A/D 이동, S 발사, Q 종료)\r\n",
-        remaining,
-        blocks.len(),
-        total_blocks
-    ));
-    frame.push_str(&"-".repeat(WIDTH as usize));
-    frame.push_str("\r\n");
-
-    for y in 0..HEIGHT {
-        let mut line = String::with_capacity(WIDTH as usize);
-        for x in 0..WIDTH {
-            let ch = if y == player_y && x == player_x {
-                'A'
-            } else if blocks.contains(&(x, y)) {
-                '#'
-            } else if bullets.iter().any(|b| b.x == x && b.y == y) {
-                '|'
-            } else {
-                '.'
-            };
-            line.push(ch);
-        }
-        frame.push_str(&line);
-        frame.push_str("\r\n");
-    }
-
-    execute!(
-        out,
-        cursor::MoveTo(0, 0),
-        terminal::Clear(ClearType::All),
-        Print(frame)
-    )?;
-    out.flush()?;
-    Ok(())
+fn invalid(msg: impl Into<String>) -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidInput, msg.into())
 }
