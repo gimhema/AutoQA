@@ -5,6 +5,41 @@
 
 ---
 
+## 빌드 & 실행
+
+**터미널 2개** 필요. host가 TCP 서버를 열고 join이 접속한다.
+
+```bash
+cd Games/TheWeapons/TheWeapons
+cargo build --release
+```
+
+**Step 1** — 터미널 A: 방 만들기 (세팅 결정)
+```bash
+cargo run --release -- host --sockets 3 --hp 10 --sword 5 --shield 5 --spear 5 --port 9600
+# "포트 9600에서 상대 접속 대기 중…" 메시지 후 대기
+```
+
+**Step 2** — 터미널 B: 방 참가
+```bash
+cargo run --release -- join 127.0.0.1:9600
+# 연결되면 양쪽 터미널에서 게임 시작
+```
+
+### 조작법
+
+매 턴 소켓 수만큼 공백으로 구분된 토큰을 입력한다. `s`=검 `d`=방패 `p`=창 `.`=빈 소켓.
+
+```
+카드 배치 (3개 토큰, s=검 d=방패 p=창 .=빈, 종료=q) > s d .
+```
+
+위 입력은 소켓1에 검, 소켓2에 방패, 소켓3은 비워둔다는 뜻이다. `q` 입력 시 즉시 종료.
+
+두 플레이어의 입력이 모이면 동시에 공개되어 아래 규칙대로 판정되고, 결과가 화면에 표시된다.
+
+---
+
 ## 세팅
 
 게임 시작 전 두 플레이어가 합의해 결정한다.
@@ -111,11 +146,12 @@
 
 ## Ouroboros 에이전트 연동 (예정)
 
-> 현재 게임 구현 전 단계. 아래는 예정된 연동 방식이다.
+> 기본 게임(host/join)은 구현 완료. `ai` 서브커맨드(Ouroboros 자동 플레이)는 아직 없다.
+> 아래는 예정된 연동 방식이다.
 
 **Step 1** — 터미널 A: 게임 실행 (에이전트 접속 대기)
 ```bash
-cd Games/TheWeapons
+cd Games/TheWeapons/TheWeapons
 cargo run --release -- ai --ouroboros-port 9000
 ```
 
