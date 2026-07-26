@@ -19,6 +19,11 @@ pub struct CardInfo
 
 }
 
+pub struct CardActionResult
+{
+    
+}
+
 pub trait CardAction {
     fn Action(&self);
 }
