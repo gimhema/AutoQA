@@ -5,7 +5,13 @@ pub enum CardType
 {
     SWORD,
     SHIELD,
-    SPEAR
+    SPEAR,
+    ARMOR,
+    POISON_ARROW,
+    POTION,
+    FIREBOMB,
+    AXE,
+    HOOK
 }
 
 pub struct Card
