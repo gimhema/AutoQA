@@ -14,12 +14,27 @@ pub enum CardType
     HOOK
 }
 
-pub struct Card
+pub struct CardInfo
 {
 
 }
 
-impl Card
-{
-
+pub trait CardAction {
+    fn Action(&self);
 }
+
+
+/*
+Card Implementation Guid
+
+pub struct SwordCard
+{
+    cardInfo : CardInfo
+}
+
+impl CardAction for SwordCard
+{
+    fn Action(&self);
+}
+
+*/
