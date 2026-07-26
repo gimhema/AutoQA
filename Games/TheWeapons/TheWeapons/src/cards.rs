@@ -21,11 +21,11 @@ pub struct CardInfo
 
 pub struct CardActionResult
 {
-    
+    Value : i32
 }
 
 pub trait CardAction {
-    fn Action(&self);
+    fn Action(&self) -> CardActionResult;
 }
 
 
@@ -39,7 +39,9 @@ pub struct SwordCard
 
 impl CardAction for SwordCard
 {
-    fn Action(&self);
+    fn Action(&self) -> CardActionResult {
+    
+    }
 }
 
 */
