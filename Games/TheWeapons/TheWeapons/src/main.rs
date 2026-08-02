@@ -4,6 +4,8 @@
 //! 실행:
 //!   host: `theweapons host [--sockets N] [--hp N] [--sword N] [--shield N] [--spear N] [--port P]`
 //!   join: `theweapons join <host:port>`
+//!   ai:   `theweapons ai [--sockets N] [--hp N] [--sword N] [--shield N] [--spear N] [--ouroboros-port P]`
+//!         Ouroboros 에이전트가 접속해 상대 진영을 대신 플레이한다.
 //!
 //! 입력은 소켓 수만큼의 토큰(공백 구분)이며 각 토큰은 s(검)/d(방패)/p(창)/.(빈 소켓) 중 하나다.
 //! 예: `s d .` = 소켓1 검, 소켓2 방패, 소켓3 비움.
@@ -11,6 +13,7 @@
 mod cards;
 mod game;
 mod net;
+mod ouroboros;
 mod render;
 
 use std::io::{self, Write};
@@ -20,12 +23,14 @@ use game::{Config, Match};
 use net::{Msg, Peer};
 
 const DEFAULT_PORT: u16 = 9600;
+const DEFAULT_OUROBOROS_PORT: u16 = 9000;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let result = match args.get(1).map(|s| s.as_str()) {
         Some("host") => run_host(&args[2..]),
         Some("join") => run_join(&args[2..]),
+        Some("ai") => run_ai(&args[2..]),
         _ => {
             print_usage(&args[0]);
             std::process::exit(1);
@@ -39,10 +44,13 @@ fn main() {
 
 fn print_usage(prog: &str) {
     eprintln!(
-        "TheWeapons — 2인 대전 카드 게임\n\n\
+        "TheWeapons — 2인 대전 카드 게임 / Ouroboros AI 대전\n\n\
          사용법:\n  \
            {prog} host [--sockets N] [--hp N] [--sword N] [--shield N] [--spear N] [--port P]\n  \
-           {prog} join <host:port>\n\n\
+           {prog} join <host:port>\n  \
+           {prog} ai   [--sockets N] [--hp N] [--sword N] [--shield N] [--spear N] [--ouroboros-port P]\n\n\
+         ai 모드: 당신이 터미널로 한 진영을, Ouroboros가 접속해 나머지 진영을 맡는다\n  \
+                  (기본 포트 {DEFAULT_OUROBOROS_PORT})\n\n\
          입력: 소켓 수만큼 토큰(공백 구분). s=검 d=방패 p=창 .=빈 소켓\n  \
          예: `s d .` = 소켓1 검, 소켓2 방패, 소켓3 비움\n"
     );
@@ -140,6 +148,72 @@ fn run_join(args: &[String]) -> io::Result<()> {
     play(Match::new(config), peer)
 }
 
+/// ai: Ouroboros가 상대 진영을 담당하는 사람 vs Ouroboros 모드.
+fn run_ai(args: &[String]) -> io::Result<()> {
+    let mut socket_count = 3usize;
+    let mut initial_hp = 10i32;
+    let mut sword_count = 5u32;
+    let mut shield_count = 5u32;
+    let mut spear_count = 5u32;
+    let mut ouroboros_port = DEFAULT_OUROBOROS_PORT;
+
+    let mut i = 0;
+    while i < args.len() {
+        let need = |i: usize| -> io::Result<&String> {
+            args.get(i + 1)
+                .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, format!("{} 값이 필요합니다", args[i])))
+        };
+        match args[i].as_str() {
+            "--sockets" => {
+                socket_count = need(i)?
+                    .parse()
+                    .map_err(|_| invalid("--sockets 값은 정수여야 합니다"))?;
+            }
+            "--hp" => {
+                initial_hp = need(i)?
+                    .parse()
+                    .map_err(|_| invalid("--hp 값은 정수여야 합니다"))?;
+            }
+            "--sword" => {
+                sword_count = need(i)?
+                    .parse()
+                    .map_err(|_| invalid("--sword 값은 정수여야 합니다"))?;
+            }
+            "--shield" => {
+                shield_count = need(i)?
+                    .parse()
+                    .map_err(|_| invalid("--shield 값은 정수여야 합니다"))?;
+            }
+            "--spear" => {
+                spear_count = need(i)?
+                    .parse()
+                    .map_err(|_| invalid("--spear 값은 정수여야 합니다"))?;
+            }
+            "--ouroboros-port" => {
+                ouroboros_port = need(i)?
+                    .parse()
+                    .map_err(|_| invalid("--ouroboros-port 값은 포트 번호여야 합니다"))?;
+            }
+            other => return Err(invalid(format!("알 수 없는 옵션: {other}"))),
+        }
+        i += 2;
+    }
+
+    let config = Config {
+        socket_count,
+        initial_hp,
+        sword_count,
+        shield_count,
+        spear_count,
+    };
+    config.validate().map_err(invalid)?;
+
+    ouroboros::run(ouroboros::AiConfig {
+        game_config: config,
+        ouroboros_port,
+    })
+}
+
 /// 공통 게임 루프. 매 턴 내 배치를 받아 상대와 교환하고 동시에 판정한다.
 fn play(mut m: Match, mut peer: Peer) -> io::Result<()> {
     loop {
@@ -190,7 +264,7 @@ fn play(mut m: Match, mut peer: Peer) -> io::Result<()> {
 /// - `Ok(Some(play))`: 소켓 수·손패 범위를 통과한 배치
 /// - `Ok(None)`: 사용자가 종료(quit/q) 또는 EOF
 /// - `Err`: 형식 오류 또는 손패 초과
-fn read_play(m: &Match) -> io::Result<Option<Vec<Option<Card>>>> {
+pub(crate) fn read_play(m: &Match) -> io::Result<Option<Vec<Option<Card>>>> {
     print!(
         "카드 배치 ({}개 토큰, s=검 d=방패 p=창 .=빈, 종료=q) > ",
         m.config.socket_count

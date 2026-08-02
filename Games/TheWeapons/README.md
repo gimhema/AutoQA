@@ -144,15 +144,21 @@ cargo run --release -- join 127.0.0.1:9600
 
 ---
 
-## Ouroboros 에이전트 연동 (예정)
+## Ouroboros 에이전트 연동
 
-> 기본 게임(host/join)은 구현 완료. `ai` 서브커맨드(Ouroboros 자동 플레이)는 아직 없다.
-> 아래는 예정된 연동 방식이다.
+`ai` 모드에서는 host/join처럼 TCP로 두 사람을 잇지 않는다. **한 프로세스 안에서** 당신은
+터미널로, Ouroboros는 TCP로 각각 한 진영을 맡는다. 이 게임은 동시 공개라 순서가
+중요한데, Ouroboros는 당신이 이번 턴에 무엇을 냈는지 판정 전까지 알 수 없다 —
+관측에는 항상 턴 시작 시점의 상태(HP·손패)만 담긴다.
+
+**터미널 2개** 필요. **항상 TheWeapons를 먼저 실행**해야 한다. 순서가 반대면 Ouroboros가
+접속할 대상을 찾지 못해 실패한다.
 
 **Step 1** — 터미널 A: 게임 실행 (에이전트 접속 대기)
 ```bash
 cd Games/TheWeapons/TheWeapons
-cargo run --release -- ai --ouroboros-port 9000
+cargo run --release -- ai --sockets 3 --hp 10 --sword 5 --shield 5 --spear 5 --ouroboros-port 9000
+# "포트 9000에서 Ouroboros 접속 대기 중…" 메시지 후 대기
 ```
 
 **Step 2** — 터미널 B: 에이전트 접속
@@ -160,12 +166,29 @@ cargo run --release -- ai --ouroboros-port 9000
 cd Ouroboros
 cargo run --release -- 127.0.0.1:9000 "상대의 HP를 먼저 소진시켜라" \
   --action-space dynamic \
-  --rulebook ../Games/TheWeapons/Rule/RULEBOOK.md
+  --rulebook ../Games/TheWeapons/TheWeapons/Rule/RULEBOOK.md \
+  --llm-model phi4-mini
+# Ouroboros가 접속하면 터미널 A에서 게임이 시작된다
 ```
+
+**Step 3** — 터미널 A에서 사람이 플레이. 매 턴 당신이 카드를 배치하고 나면, Ouroboros가
+상대 진영의 카드를 결정해 동시에 공개·판정된다.
+
+### ai 모드 옵션
+
+| 옵션 | 기본값 | 설명 |
+|------|--------|------|
+| `--sockets N` | 3 | 소켓 수 |
+| `--hp N` | 10 | 초기 HP |
+| `--sword N` / `--shield N` / `--spear N` | 5 / 5 / 5 | 카드 구성 (양측 동일) |
+| `--ouroboros-port P` | 9000 | Ouroboros 대기 포트 |
 
 ---
 
-## 관측 / 액션 포맷 (예정)
+## 관측 / 액션 포맷
+
+게임은 사람이 이번 턴 입력을 마친 직후, Ouroboros에게 아래 관측을 보낸다(`my_*`는
+Ouroboros 자신의 시점).
 
 ```json
 {
@@ -175,10 +198,13 @@ cargo run --release -- 127.0.0.1:9000 "상대의 HP를 먼저 소진시켜라" \
   "socket_count": 3,
   "valid_actions": [
     {"slots": ["sword", "shield", "empty"]},
-    {"slots": ["spear", "empty", "empty"]},
-    ...
+    {"slots": ["spear", "empty", "empty"]}
   ]
 }
 ```
 
-액션은 `valid_actions` 항목 중 하나를 그대로 반환한다.
+`valid_actions`는 현재 손패로 감당 가능한 소켓 배치 조합 전체다(형식/손패 검증은 게임이
+미리 다 해준다). Ouroboros는 그중 하나를 그대로 반환한다: `{"slots": [...]}`.
+소켓이 많아지면 조합 수가 기하급수적으로 늘어나므로(최대 4^소켓수), 게임은 안전판으로
+`valid_actions` 개수를 2048개에서 자른다 — `--sockets`는 기본값(3) 근처로 유지하는 것을
+권장한다.

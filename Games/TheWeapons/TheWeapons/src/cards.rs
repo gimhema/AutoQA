@@ -30,6 +30,25 @@ impl Card {
             Card::Spear => "창",
         }
     }
+
+    /// 와이어 프로토콜(net.rs, ouroboros.rs)에서 공용으로 쓰는 영문 키.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Card::Sword => "sword",
+            Card::Shield => "shield",
+            Card::Spear => "spear",
+        }
+    }
+
+    /// `as_str`의 역변환.
+    pub fn parse_str(s: &str) -> Option<Card> {
+        match s {
+            "sword" => Some(Card::Sword),
+            "shield" => Some(Card::Shield),
+            "spear" => Some(Card::Spear),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for Card {

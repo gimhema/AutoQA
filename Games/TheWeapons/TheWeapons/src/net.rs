@@ -31,24 +31,10 @@ pub enum Msg {
     Quit,
 }
 
-fn card_to_str(card: Card) -> &'static str {
-    match card {
-        Card::Sword => "sword",
-        Card::Shield => "shield",
-        Card::Spear => "spear",
-    }
-}
-
 fn card_from_str(s: &str) -> io::Result<Card> {
-    match s {
-        "sword" => Ok(Card::Sword),
-        "shield" => Ok(Card::Shield),
-        "spear" => Ok(Card::Spear),
-        other => Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("unknown card: {other}"),
-        )),
-    }
+    Card::parse_str(s).ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidData, format!("unknown card: {s}"))
+    })
 }
 
 impl Msg {
@@ -64,7 +50,7 @@ impl Msg {
             }),
             Msg::Play(play) => json!({
                 "type": "play",
-                "slots": play.iter().map(|s| s.map(card_to_str)).collect::<Vec<_>>(),
+                "slots": play.iter().map(|s| s.map(Card::as_str)).collect::<Vec<_>>(),
             }),
             Msg::Quit => json!({ "type": "quit" }),
         }
