@@ -10,7 +10,8 @@ pub struct Geometry
 pub struct CommonStatus
 {
     pub health : i32,
-    pub name : String
+    pub name : String,
+    pub speed : i32
 }
 
 pub struct Actor
@@ -21,21 +22,25 @@ pub struct Actor
 
 impl CommonStatus
 {
-    fn Init(&self) {
-        
+    fn Init(&mut self) {
+        self.health = 0;
+        self.name = String::new();
+        self.speed = 0;
     }
 }
 
 impl Geometry
 {
-    fn Init(&self) {
-        
+    fn  Init(&mut self) {
+        self.x = 0;
+        self.y = 0;
     }
 }
 
 impl Actor
 {
-    fn Init(&self) {
-
+    fn Init(&mut self) {
+        self.status.Init();
+        self.geometry.Init();   
     }
 }
