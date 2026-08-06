@@ -1,3 +1,4 @@
+use crate::config;
 
 
 pub struct Geometry
@@ -21,14 +22,14 @@ pub struct Actor
 impl CommonStatus
 {
     fn Init(&self) {
-
+        
     }
 }
 
 impl Geometry
 {
     fn Init(&self) {
-
+        
     }
 }
 

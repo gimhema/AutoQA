@@ -1,8 +1,8 @@
-mod minion
+use crate::minion;
 
 pub struct PlayerController
 {
-    
+
 }
 
 impl PlayerController
