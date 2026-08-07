@@ -1,4 +1,5 @@
 mod common;
+mod common_logic;
 mod controller;
 mod enemy;
 mod minion;
