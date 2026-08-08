@@ -1,6 +1,6 @@
 
 use crate::perks;
-use crate::common::ActorInfo;
+use crate::common::{ActorInfo, CommonStatus, Geometry};
 
 pub mod MINION_MODE
 {
@@ -13,11 +13,28 @@ pub mod MINION_MODE
 
 pub struct Minion
 {
+    pub id : usize,
     pub actorInfo : ActorInfo
 }
 
 impl Minion
 {
+    pub fn New(id : usize) -> Self {
+        Minion {
+            id,
+            actorInfo : ActorInfo {
+                status : CommonStatus {
+                    health : 0,
+                    name : String::new(),
+                    speed : 0,
+                    power : 0,
+                    defense : 0
+                },
+                geometry : Geometry { x : 0, y : 0 }
+            }
+        }
+    }
+
     pub fn Init (&mut self) {
         self.actorInfo.Init();
     }
