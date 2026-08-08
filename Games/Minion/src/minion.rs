@@ -1,6 +1,6 @@
 
 use crate::perks;
-use crate::common;
+use crate::common::ActorInfo;
 
 pub mod MINION_MODE
 {
@@ -13,5 +13,12 @@ pub mod MINION_MODE
 
 pub struct Minion
 {
-    
+    pub actorInfo : ActorInfo
+}
+
+impl Minion
+{
+    pub fn Init (&mut self) {
+        self.actorInfo.Init();
+    }
 }

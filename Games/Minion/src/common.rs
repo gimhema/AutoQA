@@ -16,7 +16,7 @@ pub struct CommonStatus
     pub defense : i32
 }
 
-pub struct Actor
+pub struct ActorInfo
 {
     pub status : CommonStatus,
     pub geometry : Geometry
@@ -35,20 +35,20 @@ impl CommonStatus
 
 impl Geometry
 {
-    fn  Init(&mut self) {
+    pub fn  Init(&mut self) {
         self.x = 0;
         self.y = 0;
     }
 
-    fn Update(&mut self, x : i32, y : i32) {
+    pub fn Update(&mut self, x : i32, y : i32) {
         self.x = x;
         self.y = y;
     }
 }
 
-impl Actor
+impl ActorInfo
 {
-    fn Init(&mut self) {
+    pub fn Init(&mut self) {
         self.status.Init();
         self.geometry.Init();   
     }
