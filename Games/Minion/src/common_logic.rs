@@ -5,7 +5,7 @@ pub mod CommonLogicUtil
 {
     use crate::{common::Geometry, minion::Minion};
 
-    pub fn IsExistMinion(target_pos : Geometry) -> Option<&mut Minion> {
+    pub fn IsExistMinion(target_pos : Geometry, minions : &mut Vec<Minion>) -> Option<&mut Minion> {
 
         return None
     }
