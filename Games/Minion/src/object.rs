@@ -11,7 +11,8 @@ pub mod EOBJECT
 
 pub trait ObjectBehavior 
 {
-    fn 
+    fn Spawn(&mut self, objInfo : ObjectInfo);
+    fn Destroy(&mut self);
 }
 
 struct ObjectInfo
