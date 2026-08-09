@@ -1,4 +1,4 @@
-use crate::minion::Minion;
+use crate::minion::{Minion, EMINION};
 
 pub struct World
 {
@@ -11,9 +11,9 @@ impl World
         World { minions : Vec::new() }
     }
 
-    pub fn SpawnMinion(&mut self) -> usize {
+    pub fn SpawnMinion(&mut self, kind : EMINION::KIND) -> usize {
         let id = self.minions.len();
-        let mut minion = Minion::New(id);
+        let mut minion = Minion::New(id, kind);
         minion.Init();
         self.minions.push(minion);
         id

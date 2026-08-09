@@ -1,5 +1,6 @@
 use crate::world::World;
 use crate::minion::Minion;
+use crate::attack::AttackContext;
 use macroquad::prelude::*;
 
 pub struct PlayerController
@@ -51,6 +52,13 @@ impl PlayerController
     pub fn Shoot(&mut self, world : &mut World) {
         let Some(minion) = self.GetPawn(world) else { return; };
 
-        minion.Attack();
+        let ctx = AttackContext {
+            origin : minion.actorInfo.geometry,
+            aim_angle : self.aim_angle,
+            power : minion.actorInfo.status.power
+        };
+        let attack_kind = minion.attack_kind;
+
+        attack_kind.attack(ctx, world);
     }
 }
