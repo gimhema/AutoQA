@@ -9,6 +9,11 @@ pub mod EOBJECT
     }
 }
 
+pub trait ObjectBehavior 
+{
+    fn 
+}
+
 struct ObjectInfo
 {
 
