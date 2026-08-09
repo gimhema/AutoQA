@@ -1,5 +1,6 @@
 use crate::common::Geometry;
 use crate::world::World;
+use crate::object;
 
 #[derive(Clone, Copy)]
 pub struct AttackContext

@@ -7,6 +7,7 @@ mod config;
 mod perks;
 mod world;
 mod attack;
+mod object;
 
 use common::Geometry;
 use controller::PlayerController;
