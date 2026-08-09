@@ -21,8 +21,8 @@ async fn main() {
         minion.actorInfo.geometry = Geometry { x: 400, y: 300 };
     }
 
-    let mut player = PlayerController::New();
-    player.Possess(player_id);
+    let mut player = PlayerController::New(0);
+    player.Possess(&mut world, player_id);
 
     loop {
         clear_background(BLACK);

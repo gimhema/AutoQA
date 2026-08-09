@@ -14,6 +14,7 @@ pub mod MINION_MODE
 pub struct Minion
 {
     pub id : usize,
+    pub controller_id : Option<usize>,
     pub actorInfo : ActorInfo
 }
 
@@ -22,6 +23,7 @@ impl Minion
     pub fn New(id : usize) -> Self {
         Minion {
             id,
+            controller_id : None,
             actorInfo : ActorInfo {
                 status : CommonStatus {
                     health : 0,
@@ -37,5 +39,9 @@ impl Minion
 
     pub fn Init (&mut self) {
         self.actorInfo.Init();
+    }
+
+    pub fn GetOwner(&self) -> Option<usize> {
+        self.controller_id
     }
 }

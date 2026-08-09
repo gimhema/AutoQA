@@ -3,6 +3,7 @@ use macroquad::prelude::*;
 
 pub struct PlayerController
 {
+    pub id : usize,
     pub possessed_id : Option<usize>,
     pub aim_angle : f32,
     pub speed : i32
@@ -10,16 +11,20 @@ pub struct PlayerController
 
 impl PlayerController
 {
-    pub fn New() -> Self {
+    pub fn New(id : usize) -> Self {
         PlayerController {
+            id,
             possessed_id : None,
             aim_angle : 0.0,
             speed : 5
         }
     }
 
-    pub fn Possess(&mut self, id : usize) {
+    pub fn Possess(&mut self, world : &mut World, id : usize) {
         self.possessed_id = Some(id);
+        if let Some(minion) = world.GetMinionMut(id) {
+            minion.controller_id = Some(self.id);
+        }
     }
 
     pub fn Update(&mut self, world : &mut World) {
