@@ -51,6 +51,6 @@ impl PlayerController
     pub fn Shoot(&mut self, world : &mut World) {
         let Some(minion) = self.GetPawn(world) else { return; };
 
-        
+        minion.Attack();
     }
 }

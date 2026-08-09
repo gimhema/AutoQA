@@ -5,13 +5,17 @@ use crate::common::{ActorInfo, CommonStatus, Geometry};
 pub mod EMINION
 {
     enum MODE {
-        NONE_PLAYER = 0,
+        DEFAULT = -1,
+        NONEPLAYER = 0,
         PLAYERBLE = 1,
         ENEMY = 2
     }
 
     enum KIND {
-        
+        DEFAULT = -1,
+        RED = 0,
+        ENEMY_MINI_BALL = 1,
+        ENEMY_BOSS_RECT = 2
     }
 }
 
@@ -48,5 +52,9 @@ impl Minion
 
     pub fn GetOwner(&self) -> Option<usize> {
         self.controller_id
+    }
+
+    pub fn Attack(&mut self) {
+        
     }
 }
