@@ -2,14 +2,19 @@
 use crate::perks;
 use crate::common::{ActorInfo, CommonStatus, Geometry};
 
-pub mod MINION_MODE
+pub mod EMINION
 {
-    enum EMODE {
+    enum MODE {
         NONE_PLAYER = 0,
         PLAYERBLE = 1,
         ENEMY = 2
     }
+
+    enum KIND {
+        
+    }
 }
+
 
 pub struct Minion
 {
