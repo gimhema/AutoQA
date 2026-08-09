@@ -13,6 +13,7 @@ pub trait ObjectBehavior
 {
     fn Spawn(&mut self, objInfo : ObjectInfo);
     fn Destroy(&mut self);
+    fn OnHit(&mut self);
 }
 
 struct ObjectInfo
