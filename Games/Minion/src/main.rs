@@ -8,6 +8,7 @@ mod perks;
 mod world;
 mod attack;
 mod object;
+mod stage;
 
 use common::Geometry;
 use controller::PlayerController;
