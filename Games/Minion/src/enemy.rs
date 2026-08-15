@@ -10,7 +10,7 @@ pub struct EnemyGroup
 
 impl EnemyGroup
 {
-    pub fn new() -> Self {
+    pub fn New() -> Self {
         return EnemyGroup {}
     }
 }

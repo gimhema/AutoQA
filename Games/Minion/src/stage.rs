@@ -11,8 +11,20 @@ pub struct GameStage
 
 impl GameStage
 {
-    pub fn new() -> Self {
-        return GameStage { level: 0, enemy_group: enemy::EnemyGroup::new() }
+    pub fn New() -> Self {
+        return GameStage { level: 0, enemy_group: enemy::EnemyGroup::New() }
+    }
+
+    pub fn Start() {
+
+    }
+
+    pub fn Run() {
+
+    }
+
+    pub fn End() {
+        
     }
 }
 
@@ -23,7 +35,7 @@ pub struct GameStageManager
 
 impl GameStageManager
 {
-    pub fn new() -> Self {
+    pub fn New() -> Self {
         return GameStageManager { stages: Vec::new() }
     }
 }
