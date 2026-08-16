@@ -2,7 +2,7 @@ use crate::enemy;
 
 
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct GameStage
 {
     pub level : i32,

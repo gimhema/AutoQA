@@ -3,6 +3,7 @@ use crate::perks;
 use crate::common::{ActorInfo, CommonStatus, Geometry};
 use crate::attack::{AttackKind, MeleeAttack, RangedAttack};
 
+
 pub mod EMINION
 {
     pub enum MODE {
