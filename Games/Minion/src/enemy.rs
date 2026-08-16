@@ -11,6 +11,15 @@ pub struct  EnemyUnitInfo
     pub spawn_num : i32
 }
 
+impl EnemyUnitInfo
+{
+    pub fn new(_mType : EMINION::KIND, _tick : i32, _num : i32) -> Self {
+        return EnemyUnitInfo { minion_type: _mType, 
+            spawn_tick: _tick, 
+            spawn_num: _num }
+    }
+}
+
 #[derive(Clone)]
 pub struct EnemyGroup
 {
