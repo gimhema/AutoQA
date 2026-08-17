@@ -1,4 +1,5 @@
 use crate::enemy;
+use crate::world::World;
 
 
 
@@ -19,12 +20,14 @@ impl GameStage
 
     }
 
-    pub fn Run() {
-
+    pub fn Run(&mut self, world : &mut World) {
+        for kind in self.enemy_group.Tick() {
+            world.SpawnMinion(kind);
+        }
     }
 
     pub fn End() {
-        
+
     }
 }
 

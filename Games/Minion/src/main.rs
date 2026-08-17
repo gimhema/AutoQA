@@ -12,7 +12,9 @@ mod stage;
 
 use common::Geometry;
 use controller::PlayerController;
+use enemy::EnemyUnitInfo;
 use minion::EMINION;
+use stage::GameStage;
 use world::World;
 use macroquad::prelude::*;
 
@@ -28,10 +30,18 @@ async fn main() {
     let mut player = PlayerController::New(0);
     player.Possess(&mut world, player_id);
 
+    let mut stage = GameStage::New();
+    stage.enemy_group.AddUnitInfo(EnemyUnitInfo {
+        minion_type : EMINION::KIND::ENEMY_MINI_BALL,
+        spawn_tick : 120,
+        spawn_num : 5
+    });
+
     loop {
         clear_background(BLACK);
 
         player.Update(&mut world);
+        stage.Run(&mut world);
 
         if let Some(minion) = world.GetMinion(player_id) {
             let pos = minion.actorInfo.geometry;

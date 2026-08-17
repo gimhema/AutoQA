@@ -20,15 +20,47 @@ impl EnemyUnitInfo
     }
 }
 
+#[derive(Clone, Copy)]
+struct EnemySpawnState
+{
+    elapsed : i32,
+    spawned : i32
+}
+
 #[derive(Clone)]
 pub struct EnemyGroup
 {
-    pub info_vec : Vec<EnemyUnitInfo>
+    entries : Vec<(EnemyUnitInfo, EnemySpawnState)>
 }
 
 impl EnemyGroup
 {
     pub fn New() -> Self {
-        return EnemyGroup { info_vec : Vec::new() }
+        return EnemyGroup { entries : Vec::new() }
+    }
+
+    pub fn AddUnitInfo(&mut self, info : EnemyUnitInfo) {
+        self.entries.push((info, EnemySpawnState { elapsed : 0, spawned : 0 }));
+    }
+
+    // world를 모르는 순수 스케줄링: 이번 틱에 스폰해야 할 종류만 돌려주고,
+    // 실제 스폰(world.SpawnMinion)은 호출부에서 처리한다.
+    pub fn Tick(&mut self) -> Vec<EMINION::KIND> {
+        let mut spawn_list = Vec::new();
+
+        for (info, state) in self.entries.iter_mut() {
+            if state.spawned >= info.spawn_num {
+                continue;
+            }
+
+            state.elapsed += 1;
+            if state.elapsed >= info.spawn_tick {
+                state.elapsed = 0;
+                state.spawned += 1;
+                spawn_list.push(info.minion_type);
+            }
+        }
+
+        spawn_list
     }
 }
