@@ -6,6 +6,7 @@ use crate::attack::{AttackKind, MeleeAttack, RangedAttack};
 
 pub mod EMINION
 {
+    #[derive(Clone, Copy)]
     pub enum MODE {
         DEFAULT = -1,
         NONEPLAYER = 0,
@@ -28,7 +29,8 @@ pub struct Minion
     pub id : usize,
     pub controller_id : Option<usize>,
     pub actorInfo : ActorInfo,
-    pub attack_kind : AttackKind
+    pub attack_kind : AttackKind,
+    pub mode : EMINION::MODE
 }
 
 impl Minion
@@ -38,6 +40,12 @@ impl Minion
             EMINION::KIND::ENEMY_MINI_BALL => AttackKind::Ranged(RangedAttack { projectile_speed : 6 }),
             EMINION::KIND::ENEMY_BOSS_RECT => AttackKind::Melee(MeleeAttack),
             _ => AttackKind::Melee(MeleeAttack)
+        };
+
+        let mode = match kind {
+            EMINION::KIND::RED => EMINION::MODE::PLAYERBLE,
+            EMINION::KIND::ENEMY_MINI_BALL | EMINION::KIND::ENEMY_BOSS_RECT => EMINION::MODE::ENEMY,
+            EMINION::KIND::DEFAULT => EMINION::MODE::NONEPLAYER
         };
 
         Minion {
@@ -53,7 +61,8 @@ impl Minion
                 },
                 geometry : Geometry { x : 0, y : 0 }
             },
-            attack_kind
+            attack_kind,
+            mode
         }
     }
 

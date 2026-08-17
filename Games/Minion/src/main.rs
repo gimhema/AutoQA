@@ -21,7 +21,7 @@ use macroquad::prelude::*;
 #[macroquad::main("Minion")]
 async fn main() {
     let mut world = World::New();
-    let player_id = world.SpawnMinion(EMINION::KIND::RED);
+    let player_id = world.SpawnMinion(EMINION::KIND::RED).expect("failed to spawn player");
 
     if let Some(minion) = world.GetMinionMut(player_id) {
         minion.actorInfo.geometry = Geometry { x: 400, y: 300 };
