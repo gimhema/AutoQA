@@ -13,6 +13,7 @@ mod policy_discrete;
 mod policy_continuous;
 mod policy_dynamic;
 mod policy_gen;
+mod data_monitor;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
