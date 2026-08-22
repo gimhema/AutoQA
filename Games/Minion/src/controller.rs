@@ -55,7 +55,8 @@ impl PlayerController
         let ctx = AttackContext {
             origin : minion.actorInfo.geometry,
             aim_angle : self.aim_angle,
-            power : minion.actorInfo.status.power
+            power : minion.actorInfo.status.power,
+            owner_id : Some(minion.id)
         };
         let attack_kind = minion.attack_kind;
 

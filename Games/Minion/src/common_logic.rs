@@ -16,7 +16,7 @@ pub mod DamageInterface
     use crate::{common::Geometry, minion::Minion};
 
     pub fn ApplyDamageDirect(target: &mut Minion, damage : i32) {
-        
+        target.actorInfo.status.health -= damage;
     }
 
     pub fn ApplyDamage(attack: &Minion, target: &mut Minion) {

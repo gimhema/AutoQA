@@ -37,9 +37,10 @@ impl Minion
 {
     pub fn New(id : usize, kind : EMINION::KIND) -> Self {
         let attack_kind = match kind {
+            EMINION::KIND::RED => AttackKind::Ranged(RangedAttack { projectile_speed : 8 }),
             EMINION::KIND::ENEMY_MINI_BALL => AttackKind::Ranged(RangedAttack { projectile_speed : 6 }),
             EMINION::KIND::ENEMY_BOSS_RECT => AttackKind::Melee(MeleeAttack),
-            _ => AttackKind::Melee(MeleeAttack)
+            EMINION::KIND::DEFAULT => AttackKind::Melee(MeleeAttack)
         };
 
         let mode = match kind {
@@ -48,15 +49,22 @@ impl Minion
             EMINION::KIND::DEFAULT => EMINION::MODE::NONEPLAYER
         };
 
+        let (health, power, speed) = match kind {
+            EMINION::KIND::RED => (100, 10, 5),
+            EMINION::KIND::ENEMY_MINI_BALL => (20, 5, 3),
+            EMINION::KIND::ENEMY_BOSS_RECT => (300, 20, 2),
+            EMINION::KIND::DEFAULT => (0, 0, 0)
+        };
+
         Minion {
             id,
             controller_id : None,
             actorInfo : ActorInfo {
                 status : CommonStatus {
-                    health : 0,
+                    health,
                     name : String::new(),
-                    speed : 0,
-                    power : 0,
+                    speed,
+                    power,
                     defense : 0
                 },
                 geometry : Geometry { x : 0, y : 0 }

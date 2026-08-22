@@ -43,14 +43,27 @@ async fn main() {
         player.Update(&mut world);
         stage.Run(&mut world);
 
+        world.UpdateObjects();
+        world.ProcessBulletCollisions();
+        world.RemoveDeadMinions();
+
+        for minion in world.minions.iter() {
+            let pos = minion.actorInfo.geometry;
+            let color = if minion.id == player_id { YELLOW } else { RED };
+            draw_circle(pos.x as f32, pos.y as f32, 15.0, color);
+        }
+
+        for obj in world.objects.iter() {
+            let pos = obj.GetInfo().pos;
+            draw_circle(pos.x as f32, pos.y as f32, 4.0, ORANGE);
+        }
+
         if let Some(minion) = world.GetMinion(player_id) {
             let pos = minion.actorInfo.geometry;
-            draw_circle(pos.x as f32, pos.y as f32, 15.0, YELLOW);
-
             let aim_len = 40.0;
             let aim_end_x = pos.x as f32 + player.aim_angle.cos() * aim_len;
             let aim_end_y = pos.y as f32 + player.aim_angle.sin() * aim_len;
-            draw_line(pos.x as f32, pos.y as f32, aim_end_x, aim_end_y, 3.0, RED);
+            draw_line(pos.x as f32, pos.y as f32, aim_end_x, aim_end_y, 3.0, WHITE);
         }
 
         next_frame().await;

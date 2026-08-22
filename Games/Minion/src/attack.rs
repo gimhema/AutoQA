@@ -7,7 +7,8 @@ pub struct AttackContext
 {
     pub origin : Geometry,
     pub aim_angle : f32,
-    pub power : i32
+    pub power : i32,
+    pub owner_id : Option<usize>
 }
 
 pub trait AttackBehavior
@@ -34,7 +35,7 @@ pub struct RangedAttack
 impl AttackBehavior for RangedAttack
 {
     fn Attack(&self, ctx : AttackContext, world : &mut World) {
-        // TODO: 투사체 발사 로직
+        world.SpawnBullet(ctx.owner_id, ctx.origin, ctx.aim_angle, self.projectile_speed, ctx.power);
     }
 }
 

@@ -1,5 +1,7 @@
 use crate::enemy;
 use crate::world::World;
+use crate::common::Geometry;
+use macroquad::prelude::*;
 
 
 
@@ -22,7 +24,13 @@ impl GameStage
 
     pub fn Run(&mut self, world : &mut World) {
         for kind in self.enemy_group.Tick() {
-            world.SpawnMinion(kind);
+            let Some(id) = world.SpawnMinion(kind) else { continue; };
+            let Some(minion) = world.GetMinionMut(id) else { continue; };
+
+            minion.actorInfo.geometry = Geometry {
+                x : rand::gen_range(0, screen_width() as i32),
+                y : rand::gen_range(0, screen_height() as i32)
+            };
         }
     }
 
