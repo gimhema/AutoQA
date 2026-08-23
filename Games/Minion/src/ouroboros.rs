@@ -11,12 +11,25 @@
 //!   "player": {"x":.., "y":.., "hp":.., "aim_angle":..},
 //!   "enemies": [{"id":.., "x":.., "y":.., "hp":.., "is_boss":bool}, ...],
 //!   "stage": {"number":.., "kills":.., "boss_threshold":.., "boss_spawned":bool, "cleared":bool},
-//!   "perk_choices": [{"index":1, "type":"INC_ATTACK", "amount":5}, ...]
+//!   "perk_choices": [{"index":1, "type":"INC_ATTACK", "amount":5}, ...],
+//!   "valid_actions": [
+//!     {"action":"move", "dx":-1, "dy":0},
+//!     {"action":"shoot", "target_x":.., "target_y":.., "target_id":.., "dist":.., "is_boss":bool, "target_hp":..},
+//!     {"action":"choose_perk", "index":1, "type":"INC_ATTACK", "amount":5}
+//!   ]
 //! }
 //! ```
 //! `perk_choices`는 `flow == "choosing_perk"`일 때만 채워진다.
 //!
+//! `valid_actions`는 이번 관측 시점 기준으로 이미 좌표까지 계산된, 그대로 돌려보내면
+//! 되는 액션 후보 목록이다 (`--action-space dynamic`용). `shoot`의 `target_x`/`target_y`는
+//! 실시간으로 움직이는 좌표라 정책 생성 시점에 값을 고정할 수 없다 — LLM이 직접
+//! 좌표를 계산/추정하게 하는 대신, 매 프레임 게임이 계산한 후보를 조건으로 고르게
+//! 한다. `flow == "playing"`일 땐 이동(8방향+제자리) + 살아있는 적마다 하나씩의
+//! `shoot`, `flow == "choosing_perk"`일 땐 `choose_perk` 후보만 채워진다.
+//!
 //! # 액션 포맷 (Ouroboros → 게임)
+//! `valid_actions`의 항목 하나를 그대로 반환하면 되지만, 형식은 다음과 같다:
 //! - `{"action":"move", "dx":-1..1, "dy":-1..1}` — WASD와 동일한 의미
 //! - `{"action":"shoot", "target_x":.., "target_y":..}` — 해당 좌표로 조준 후 발사
 //! - `{"action":"choose_perk", "index":1..}` — `flow == "choosing_perk"`일 때만 유효
@@ -139,6 +152,58 @@ fn Observation(session : &GameSession) -> Value {
         "player": player,
         "enemies": enemies,
         "stage": stage,
-        "perk_choices": perk_choices
+        "perk_choices": perk_choices,
+        "valid_actions": ValidActions(session, boss_id)
     })
+}
+
+// 이번 관측 시점 기준으로 좌표까지 이미 계산된 액션 후보 목록.
+// `--action-space dynamic` policy가 계산 없이 조건만으로 고를 수 있도록 하기 위함.
+const MOVE_DIRECTIONS : [(i64, i64); 9] = [
+    (-1, -1), (0, -1), (1, -1),
+    (-1, 0),           (1, 0),
+    (-1, 1),  (0, 1),  (1, 1),
+    (0, 0)
+];
+
+fn ValidActions(session : &GameSession, boss_id : Option<usize>) -> Vec<Value> {
+    match session.flow {
+        GameFlowState::Playing => {
+            let mut actions : Vec<Value> = MOVE_DIRECTIONS.iter()
+                .map(|(dx, dy)| json!({ "action": "move", "dx": dx, "dy": dy }))
+                .collect();
+
+            if let Some(player) = session.world.GetMinion(session.player_id) {
+                let px = player.actorInfo.geometry.x;
+                let py = player.actorInfo.geometry.y;
+
+                for enemy in session.world.minions.iter().filter(|m| m.id != session.player_id) {
+                    let dx = (enemy.actorInfo.geometry.x - px) as f32;
+                    let dy = (enemy.actorInfo.geometry.y - py) as f32;
+                    actions.push(json!({
+                        "action": "shoot",
+                        "target_x": enemy.actorInfo.geometry.x,
+                        "target_y": enemy.actorInfo.geometry.y,
+                        "target_id": enemy.id,
+                        "dist": (dx * dx + dy * dy).sqrt(),
+                        "is_boss": Some(enemy.id) == boss_id,
+                        "target_hp": enemy.actorInfo.status.health
+                    }));
+                }
+            }
+
+            actions
+        }
+        GameFlowState::ChoosingPerk => {
+            session.perk_choices.iter().enumerate()
+                .map(|(i, p)| json!({
+                    "action": "choose_perk",
+                    "index": i + 1,
+                    "type": format!("{:?}", p.perk_type),
+                    "amount": p.amount
+                }))
+                .collect()
+        }
+        GameFlowState::Victory => Vec::new()
+    }
 }
