@@ -5,3 +5,5 @@ edition = "2024"
 
 [dependencies]
 macroquad = "0.4"
+ouroboros-link = { path = "../../External/rust" }
+serde_json = "1"

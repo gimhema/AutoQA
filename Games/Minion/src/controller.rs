@@ -33,18 +33,32 @@ impl PlayerController
         world.GetMinionMut(self.possessed_id?)
     }
 
-    pub fn Update(&mut self, world : &mut World) {
+    // 사람 입력(키보드/마우스)과 네트워크 액션(Ouroboros)이 공유하는 원시 동작.
+    // dx/dy는 각 축 -1..1 (WASD와 동일한 의미: 눌린 방향으로 speed만큼 이동).
+    pub fn Move(&mut self, world : &mut World, dx : i32, dy : i32) {
         let Some(minion) = self.GetPawn(world) else { return; };
+        minion.actorInfo.geometry.x += dx * self.speed;
+        minion.actorInfo.geometry.y += dy * self.speed;
+    }
 
-        if is_key_down(KeyCode::W) { minion.actorInfo.geometry.y -= self.speed; }
-        if is_key_down(KeyCode::S) { minion.actorInfo.geometry.y += self.speed; }
-        if is_key_down(KeyCode::A) { minion.actorInfo.geometry.x -= self.speed; }
-        if is_key_down(KeyCode::D) { minion.actorInfo.geometry.x += self.speed; }
+    pub fn AimAt(&mut self, world : &mut World, target_x : f32, target_y : f32) {
+        let Some(minion) = self.GetPawn(world) else { return; };
+        let dx = target_x - minion.actorInfo.geometry.x as f32;
+        let dy = target_y - minion.actorInfo.geometry.y as f32;
+        self.aim_angle = dy.atan2(dx);
+    }
+
+    pub fn Update(&mut self, world : &mut World) {
+        let mut dx = 0;
+        let mut dy = 0;
+        if is_key_down(KeyCode::W) { dy -= 1; }
+        if is_key_down(KeyCode::S) { dy += 1; }
+        if is_key_down(KeyCode::A) { dx -= 1; }
+        if is_key_down(KeyCode::D) { dx += 1; }
+        self.Move(world, dx, dy);
 
         let (mouse_x, mouse_y) = mouse_position();
-        let dx = mouse_x - minion.actorInfo.geometry.x as f32;
-        let dy = mouse_y - minion.actorInfo.geometry.y as f32;
-        self.aim_angle = dy.atan2(dx);
+        self.AimAt(world, mouse_x, mouse_y);
 
         if is_key_down(KeyCode::Space) { self.Shoot(world); }
     }

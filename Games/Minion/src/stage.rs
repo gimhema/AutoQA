@@ -100,6 +100,10 @@ impl GameStageManager
         self.stages.get_mut(self.current_index)
     }
 
+    pub fn Peek(&self) -> Option<&GameStage> {
+        self.stages.get(self.current_index)
+    }
+
     pub fn IsFinalStage(&self) -> bool {
         self.current_index + 1 >= self.stages.len()
     }
