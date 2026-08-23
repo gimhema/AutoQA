@@ -13,11 +13,20 @@ use serde_json::Value;
 
 use crate::policy::{all_match, Cond, Policy, Rng};
 
+fn default_weight() -> f64 {
+    1.0
+}
+
 /// 가중치가 붙은 하나의 이산 액션. `command`는 그대로 [`crate::conn_message::Action`]의
 /// 본문이 된다.
+///
+/// `weight`는 LLM이 종종 빼먹는 필드라 `#[serde(default)]`로 관대하게 파싱한다
+/// (빠지면 1.0 — 균등 가중치로 취급). 없어서 파싱 전체가 깨지는 것보다
+/// 균등 확률로 취급하는 편이 낫다.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WeightedAction {
     pub command: Value,
+    #[serde(default = "default_weight")]
     pub weight: f64,
 }
 
@@ -140,5 +149,13 @@ mod tests {
     fn empty_distribution_yields_none() {
         let mut rng = Rng::new(1);
         assert_eq!(Categorical::default().sample(&mut rng), None);
+    }
+
+    #[test]
+    fn missing_weight_defaults_to_one() {
+        // LLM이 "weight" 필드를 빼먹은 경우 파싱이 깨지지 않고 1.0으로 취급돼야 한다.
+        let json = r#"{"choices": [{"command": {"key": "idle"}}]}"#;
+        let cat: Categorical = serde_json::from_str(json).unwrap();
+        assert_eq!(cat.choices[0].weight, 1.0);
     }
 }

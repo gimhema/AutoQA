@@ -48,7 +48,20 @@ pub fn generate_policy(
         ChatMessage::user(user),
     ])?;
 
+    if let Some(reasoning) = extract_reasoning(&response) {
+        eprintln!("[PolicyGen] LLM 사고 과정: {reasoning}");
+    }
+
     parse_policy_response(&response, action_space)
+}
+
+/// LLM 응답에서 JSON 블록 앞에 붙은 자연어 설명(사고 과정)을 추출한다.
+/// 시스템 프롬프트가 "no extra text"를 요구해도 작은 로컬 모델은 종종
+/// 이유를 먼저 적고 JSON을 낸다 — 그 부분을 버리지 않고 로그로 보여준다.
+fn extract_reasoning(text: &str) -> Option<&str> {
+    let end = text.find("```").or_else(|| text.find('{'))?;
+    let reasoning = text[..end].trim();
+    if reasoning.is_empty() { None } else { Some(reasoning) }
 }
 
 /// LLM 응답 텍스트를 Policy 객체로 파싱한다 (LLM 호출 없이 단독 사용 가능).
@@ -282,6 +295,20 @@ Done."#;
     #[test]
     fn extract_json_returns_none_for_no_json() {
         assert!(extract_json("no json here").is_none());
+    }
+
+    #[test]
+    fn extract_reasoning_from_preamble() {
+        let text = "The player is at low HP, so I'll prioritize retreating.\n```json\n{\"rules\": []}\n```";
+        assert_eq!(
+            extract_reasoning(text).unwrap(),
+            "The player is at low HP, so I'll prioritize retreating."
+        );
+    }
+
+    #[test]
+    fn extract_reasoning_none_when_json_is_first() {
+        assert!(extract_reasoning(r#"{"rules": []}"#).is_none());
     }
 
     #[test]
