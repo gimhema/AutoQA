@@ -99,8 +99,12 @@ impl World
         self.objects.retain(|obj| !hit_object_ids.contains(&obj.GetInfo().id));
     }
 
-    // 체력이 0 이하인 미니언 제거
-    pub fn RemoveDeadMinions(&mut self) {
-        self.minions.retain(|m| m.actorInfo.status.health > 0);
+    // 체력이 0 이하인 미니언을 제거하고, 제거된 미니언들을 돌려준다 (처치 판정용)
+    pub fn RemoveDeadMinions(&mut self) -> Vec<Minion> {
+        let (alive, dead) : (Vec<Minion>, Vec<Minion>) = self.minions
+            .drain(..)
+            .partition(|m| m.actorInfo.status.health > 0);
+        self.minions = alive;
+        dead
     }
 }

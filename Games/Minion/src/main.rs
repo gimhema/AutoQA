@@ -30,7 +30,7 @@ async fn main() {
     let mut player = PlayerController::New(0);
     player.Possess(&mut world, player_id);
 
-    let mut stage = GameStage::New();
+    let mut stage = GameStage::New(3);
     stage.enemy_group.AddUnitInfo(EnemyUnitInfo {
         minion_type : EMINION::KIND::ENEMY_MINI_BALL,
         spawn_tick : 120,
@@ -41,11 +41,11 @@ async fn main() {
         clear_background(BLACK);
 
         player.Update(&mut world);
-        stage.Run(&mut world);
 
         world.UpdateObjects();
         world.ProcessBulletCollisions();
-        world.RemoveDeadMinions();
+
+        stage.Run(&mut world);
 
         for minion in world.minions.iter() {
             let pos = minion.actorInfo.geometry;
@@ -64,6 +64,14 @@ async fn main() {
             let aim_end_x = pos.x as f32 + player.aim_angle.cos() * aim_len;
             let aim_end_y = pos.y as f32 + player.aim_angle.sin() * aim_len;
             draw_line(pos.x as f32, pos.y as f32, aim_end_x, aim_end_y, 3.0, WHITE);
+        }
+
+        draw_text(&format!("Kills: {}/{}", stage.kill_count, stage.boss_threshold), 10.0, 20.0, 24.0, WHITE);
+        if stage.boss_spawned && !stage.cleared {
+            draw_text("BOSS!", 10.0, 44.0, 24.0, RED);
+        }
+        if stage.cleared {
+            draw_text("STAGE CLEAR", 10.0, 68.0, 24.0, GREEN);
         }
 
         next_frame().await;
