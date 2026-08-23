@@ -49,8 +49,14 @@ async fn main() {
 
         for minion in world.minions.iter() {
             let pos = minion.actorInfo.geometry;
-            let color = if minion.id == player_id { YELLOW } else { RED };
-            draw_circle(pos.x as f32, pos.y as f32, 15.0, color);
+
+            if Some(minion.id) == stage.boss_id {
+                let size = 40.0;
+                draw_rectangle(pos.x as f32 - size / 2.0, pos.y as f32 - size / 2.0, size, size, PURPLE);
+            } else {
+                let color = if minion.id == player_id { YELLOW } else { RED };
+                draw_circle(pos.x as f32, pos.y as f32, 15.0, color);
+            }
         }
 
         for obj in world.objects.iter() {
