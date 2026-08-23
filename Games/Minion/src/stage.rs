@@ -82,12 +82,35 @@ impl GameStage
 
 pub struct GameStageManager
 {
-    pub stages : Vec<GameStage>
+    pub stages : Vec<GameStage>,
+    pub current_index : usize
 }
 
 impl GameStageManager
 {
     pub fn New() -> Self {
-        return GameStageManager { stages: Vec::new() }
+        return GameStageManager { stages: Vec::new(), current_index : 0 }
+    }
+
+    pub fn AddStage(&mut self, stage : GameStage) {
+        self.stages.push(stage);
+    }
+
+    pub fn Current(&mut self) -> Option<&mut GameStage> {
+        self.stages.get_mut(self.current_index)
+    }
+
+    pub fn IsFinalStage(&self) -> bool {
+        self.current_index + 1 >= self.stages.len()
+    }
+
+    // 다음 스테이지가 있으면 넘어가고 true, 이미 마지막 스테이지면 false
+    pub fn AdvanceStage(&mut self) -> bool {
+        if self.current_index + 1 < self.stages.len() {
+            self.current_index += 1;
+            true
+        } else {
+            false
+        }
     }
 }

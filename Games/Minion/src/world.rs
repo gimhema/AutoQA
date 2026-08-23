@@ -107,4 +107,10 @@ impl World
         self.minions = alive;
         dead
     }
+
+    // 스테이지 전환 시 판 정리: 남은 적/투사체 제거 (플레이어는 유지)
+    pub fn ClearEnemiesAndObjects(&mut self) {
+        self.minions.retain(|m| !matches!(m.mode, EMINION::MODE::ENEMY));
+        self.objects.clear();
+    }
 }
