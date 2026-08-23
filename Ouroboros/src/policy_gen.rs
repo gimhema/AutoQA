@@ -3,15 +3,30 @@
 //! 느린 루프의 핵심 파이프라인: intent + 관측 상태 → LLM 프롬프트 → JSON 응답 →
 //! [`DiscretePolicy`], [`ContinuousPolicy`], 또는 [`DynamicDiscretePolicy`] 객체.
 
-use std::io;
+use std::fs::OpenOptions;
+use std::io::{self, Write};
 
 use serde_json::Value;
 
+use crate::conn_message::now_millis;
 use crate::llm_interface::{ChatMessage, LlmClient};
 use crate::policy::Policy;
 use crate::policy_continuous::ContinuousPolicy;
 use crate::policy_discrete::DiscretePolicy;
 use crate::policy_dynamic::DynamicDiscretePolicy;
+
+/// policy 생성 시도 전체가 기록되는 로그 파일 (실행 디렉터리 기준, append).
+/// 터미널은 스크롤돼서 놓치기 쉬운 원본 LLM 응답을 나중에 다시 볼 수 있게 남겨둔다.
+const POLICY_LOG_PATH: &str = "policy_gen.log";
+
+/// 시스템/유저 프롬프트, 그리고 각 시도의 원본 응답 + 결과를 로그 파일에 이어붙인다.
+/// 로깅 자체가 실패해도(디스크 문제 등) policy 생성 흐름은 막지 않는다 — 조용히 무시.
+fn log_to_file(entry: &str) {
+    let Ok(mut file) = OpenOptions::new().create(true).append(true).open(POLICY_LOG_PATH) else {
+        return;
+    };
+    let _ = file.write_all(entry.as_bytes());
+}
 
 /// 게임의 액션 공간 정의. 어떤 종류의 policy를 생성할지 결정한다.
 pub enum ActionSpace {
@@ -51,6 +66,11 @@ pub fn generate_policy(
     let system = build_system_prompt(action_space, rules);
     let user = build_user_prompt(intent, state_sample);
 
+    log_to_file(&format!(
+        "\n=== [{}] generate_policy 시작 (intent={intent:?}) ===\n--- system prompt ---\n{system}\n--- user prompt ---\n{user}\n",
+        now_millis(),
+    ));
+
     let mut messages = vec![
         ChatMessage::system(system),
         ChatMessage::user(user),
@@ -66,9 +86,19 @@ pub fn generate_policy(
         }
 
         match parse_policy_response(&response, action_space) {
-            Ok(policy) => return Ok(policy),
+            Ok(policy) => {
+                log_to_file(&format!(
+                    "--- 시도 {}/{} 응답 ---\n{response}\n--- 결과: 성공 ---\n",
+                    attempt + 1, MAX_REPAIR_ATTEMPTS + 1,
+                ));
+                return Ok(policy);
+            }
             Err(e) => {
                 eprintln!("[PolicyGen] policy 파싱 실패 (시도 {}/{}): {e}", attempt + 1, MAX_REPAIR_ATTEMPTS + 1);
+                log_to_file(&format!(
+                    "--- 시도 {}/{} 응답 ---\n{response}\n--- 결과: 실패 — {e} ---\n",
+                    attempt + 1, MAX_REPAIR_ATTEMPTS + 1,
+                ));
                 messages.push(ChatMessage::assistant(response));
                 messages.push(ChatMessage::user(format!(
                     "That JSON was invalid: {e}\n\nFix it and reply with ONLY the corrected JSON object, matching the schema exactly. No extra text."
@@ -77,6 +107,8 @@ pub fn generate_policy(
             }
         }
     }
+
+    log_to_file(&format!("=== [{}] generate_policy 최종 실패 ===\n", now_millis()));
 
     Err(last_err.unwrap_or_else(|| {
         io::Error::new(io::ErrorKind::InvalidData, "failed to generate a valid policy")
