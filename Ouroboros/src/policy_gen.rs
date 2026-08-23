@@ -29,10 +29,18 @@ pub enum ActionSpace {
     Dynamic,
 }
 
+/// 파싱이 깨졌을 때 같은 대화 안에서 재요청을 시도하는 최대 횟수 (최초 시도 포함 아님).
+const MAX_REPAIR_ATTEMPTS: usize = 2;
+
 /// LLM에게 프롬프트를 보내고 응답을 파싱해 Policy를 생성한다.
 ///
 /// `rules`는 게임 규칙 컨텍스트(룰북 하네스가 숙지시킨 브리핑)다. 비어 있으면 규칙
 /// 없이 생성하며, 있으면 시스템 프롬프트 앞에 붙여 규칙에 부합하는 policy를 유도한다.
+///
+/// 작은 로컬 모델은 필수 필드를 빼먹는 등 스키마를 어기는 JSON을 낼 때가 있다.
+/// 파싱이 실패하면 그 에러 메시지를 대화에 이어붙여 같은 세션에서 최대
+/// [`MAX_REPAIR_ATTEMPTS`]번 재요청한다 (각 필드를 하나씩 방어적으로 기본값
+/// 처리하는 것보다, 모델이 스스로 스키마 전체를 다시 맞추게 하는 편이 일반적이다).
 pub fn generate_policy(
     llm: &LlmClient,
     intent: &str,
@@ -43,16 +51,36 @@ pub fn generate_policy(
     let system = build_system_prompt(action_space, rules);
     let user = build_user_prompt(intent, state_sample);
 
-    let response = llm.chat(&[
+    let mut messages = vec![
         ChatMessage::system(system),
         ChatMessage::user(user),
-    ])?;
+    ];
 
-    if let Some(reasoning) = extract_reasoning(&response) {
-        eprintln!("[PolicyGen] LLM 사고 과정: {reasoning}");
+    let mut last_err = None;
+
+    for attempt in 0..=MAX_REPAIR_ATTEMPTS {
+        let response = llm.chat(&messages)?;
+
+        if let Some(reasoning) = extract_reasoning(&response) {
+            eprintln!("[PolicyGen] LLM 사고 과정 (시도 {}/{}): {reasoning}", attempt + 1, MAX_REPAIR_ATTEMPTS + 1);
+        }
+
+        match parse_policy_response(&response, action_space) {
+            Ok(policy) => return Ok(policy),
+            Err(e) => {
+                eprintln!("[PolicyGen] policy 파싱 실패 (시도 {}/{}): {e}", attempt + 1, MAX_REPAIR_ATTEMPTS + 1);
+                messages.push(ChatMessage::assistant(response));
+                messages.push(ChatMessage::user(format!(
+                    "That JSON was invalid: {e}\n\nFix it and reply with ONLY the corrected JSON object, matching the schema exactly. No extra text."
+                )));
+                last_err = Some(e);
+            }
+        }
     }
 
-    parse_policy_response(&response, action_space)
+    Err(last_err.unwrap_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidData, "failed to generate a valid policy")
+    }))
 }
 
 /// LLM 응답에서 JSON 블록 앞에 붙은 자연어 설명(사고 과정)을 추출한다.
